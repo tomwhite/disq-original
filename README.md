@@ -27,7 +27,7 @@ See discussion below for details on each feature.
 | Indexes - read heuristic        | :white_check_mark:            | :white_check_mark:            | NA                            |
 | Indexes - read .bai/.crai       | :x:                           | :white_check_mark:            | NA                            |
 | Indexes - read .splitting-bai   | :x:                           | NA                            | NA                            |
-| Intervals                       | :white_check_mark:            | :white_check_mark:            | :x:                           |
+| Intervals                       | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Partition guarantees            | :x:                           | :x:                           | NA                            |
 | Stringency                      | :white_check_mark:            | :white_check_mark:            | NA                            |
 | Testing - large files           | :x:                           | :x:                           | :x:                           |

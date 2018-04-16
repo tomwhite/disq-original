@@ -2,6 +2,8 @@ package com.tom_e_white.squark;
 
 import com.google.common.io.Files;
 import htsjdk.samtools.util.BlockCompressedInputStream;
+import htsjdk.samtools.util.Interval;
+import htsjdk.tribble.util.TabixUtils;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 import java.io.BufferedInputStream;
@@ -10,6 +12,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
+import java.util.Collections;
 import java.util.Iterator;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -26,6 +29,9 @@ public class HtsjdkVariantsRddTest extends BaseTest {
       {"test.vcf", ".vcf", 128 * 1024},
       {"test.vcf", ".vcf.gz", 128 * 1024},
       {"test.vcf", ".vcf.bgz", 128 * 1024},
+      {"test.vcf.bgz", ".vcf", 128 * 1024},
+      {"test.vcf.bgzf.gz", ".vcf", 128 * 1024},
+      {"test.vcf.gz", ".vcf", 128 * 1024},
     };
   }
 
@@ -40,7 +46,7 @@ public class HtsjdkVariantsRddTest extends BaseTest {
 
     HtsjdkVariantsRdd htsjdkVariantsRdd = htsjdkVariantsRddStorage.read(inputPath);
 
-    int expectedCount = getVariantCount(new File(inputPath.replace("file:", "")));
+    int expectedCount = getVariantCount(new File(inputPath.replace("file:", "")), null);
     Assert.assertEquals(expectedCount, htsjdkVariantsRdd.getVariants().count());
 
     File outputFile = File.createTempFile("test", outputExtension);
@@ -54,26 +60,33 @@ public class HtsjdkVariantsRddTest extends BaseTest {
     } else {
       Assert.assertFalse("block compressed", isBlockCompressed(outputFile));
     }
-    Assert.assertEquals(expectedCount, getVariantCount(outputFile));
+    Assert.assertEquals(expectedCount, getVariantCount(outputFile, null));
+  }
+
+  private Object[] parametersForTestBgzfVcfIsSplitIntoMultiplePartitions() {
+    return new Object[][] {
+      {"HiSeq.10000.vcf.bgz", null, 4},
+      {"HiSeq.10000.vcf.bgz", new Interval("chr1", 2700000, 2800000), 1},
+      {"HiSeq.10000.vcf.bgzf.gz", null, 4},
+    };
   }
 
   @Test
-  public void testBgzfVcfIsSplitIntoMultiplePartitions() throws IOException, URISyntaxException {
-    String inputPath =
-        ClassLoader.getSystemClassLoader()
-            .getResource("HiSeq.10000.vcf.bgzf.gz")
-            .toURI()
-            .toString();
+  @Parameters
+  public void testBgzfVcfIsSplitIntoMultiplePartitions(
+      String inputFile, Interval interval, int expectedPartitions)
+      throws IOException, URISyntaxException {
+    String inputPath = ClassLoader.getSystemClassLoader().getResource(inputFile).toURI().toString();
 
     JavaRDD<VariantContext> variants =
         HtsjdkVariantsRddStorage.makeDefault(jsc)
             .splitSize(128 * 1024)
-            .read(inputPath)
+            .read(inputPath, interval == null ? null : Collections.singletonList(interval))
             .getVariants();
 
-    Assert.assertTrue(variants.getNumPartitions() > 1);
+    Assert.assertEquals(expectedPartitions, variants.getNumPartitions());
 
-    int expectedCount = getVariantCount(new File(inputPath.replace("file:", "")));
+    int expectedCount = getVariantCount(new File(inputPath.replace("file:", "")), interval);
     Assert.assertEquals(expectedCount, variants.count());
   }
 
@@ -90,15 +103,28 @@ public class HtsjdkVariantsRddTest extends BaseTest {
       actualVcf = File.createTempFile(vcf.getName(), ".gz");
       actualVcf.deleteOnExit();
       Files.copy(vcf, actualVcf);
+      File tbi = new File(vcf.getParent(), vcf.getName() + TabixUtils.STANDARD_INDEX_EXTENSION);
+      if (tbi.exists()) {
+        File actualTbi =
+            new File(
+                actualVcf.getParent(), actualVcf.getName() + TabixUtils.STANDARD_INDEX_EXTENSION);
+        actualTbi.deleteOnExit();
+        Files.copy(tbi, actualTbi);
+      }
     } else {
       actualVcf = vcf;
     }
     return new VCFFileReader(actualVcf, false);
   }
 
-  private static int getVariantCount(final File vcf) throws IOException {
+  private static int getVariantCount(final File vcf, Interval interval) throws IOException {
     final VCFFileReader vcfFileReader = parseVcf(vcf);
-    final Iterator<VariantContext> it = vcfFileReader.iterator();
+    final Iterator<VariantContext> it;
+    if (interval == null) {
+      it = vcfFileReader.iterator();
+    } else {
+      it = vcfFileReader.query(interval.getContig(), interval.getStart(), interval.getEnd());
+    }
     int recCount = 0;
     while (it.hasNext()) {
       it.next();

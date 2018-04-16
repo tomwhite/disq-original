@@ -11,6 +11,7 @@ import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockGuesser.BgzfBlock;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockSource;
+import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import htsjdk.samtools.AbstractBAMFileIndex;
 import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
@@ -114,11 +115,11 @@ public class BamSource implements Serializable {
           if (index > MAX_READ_SIZE) {
             return null;
           }
-          long vPos = block.pos << 16 | (long) up;
+          long vPos = BgzfVirtualFilePointerUtil.makeFilePointer(block.pos, up);
           // As the guesser goes to the next BGZF block before looking for BAM
           // records, the ending BGZF blocks have to always be traversed fully.
           // Hence force the length to be 0xffff, the maximum possible.
-          long vEnd = block.end << 16 | 0xffff;
+          long vEnd = BgzfVirtualFilePointerUtil.makeFilePointer(block.end, 0xffff);
           if (bamRecordGuesser.checkRecordStart(vPos)) {
             block.end();
             return new ReadRange(partitionPath, new Chunk(vPos, vEnd));

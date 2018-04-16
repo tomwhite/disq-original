@@ -9,6 +9,7 @@ import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
+import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import htsjdk.samtools.AbstractBAMFileIndex;
 import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
@@ -130,7 +131,10 @@ public class CramSource implements Serializable {
                   CRAMFileReader cramFileReader = createCramFileReader(samReader);
                   // TODO: test edge cases
                   // Subtract one from end since CRAMIterator's boundaries are inclusive
-                  Chunk readRange = new Chunk(newStart << 16, (newEnd - 1) << 16);
+                  Chunk readRange =
+                      new Chunk(
+                          BgzfVirtualFilePointerUtil.makeFilePointer(newStart),
+                          BgzfVirtualFilePointerUtil.makeFilePointer(newEnd - 1));
                   BAMFileSpan splitSpan = new BAMFileSpan(readRange);
                   HtsjdkReadsTraversalParameters<T> traversal =
                       traversalParametersBroadcast == null
