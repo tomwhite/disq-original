@@ -16,22 +16,22 @@ primitives than raw MR.
 
 See discussion below for details on each feature.
 
-| Feature                         | BAM                           | CRAM                          | VCF                           |
-| ------------------------------- | ----------------------------- | ----------------------------- | ----------------------------- |
-| Filesystems - Hadoop            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
-| Filesystems - NIO               | :white_check_mark:            | :x:                           | :x:                           |
-| Compression                     | NA                            | NA                            | :white_check_mark:            |
-| Multiple input files            | :white_check_mark:            | :white_check_mark:            | :x:                           |
-| Multiple input - header merging | :x:                           | :x:                           | :x:                           |
-| Sharded output                  | :x:                           | :x:                           | :x:                           |
-| Indexes - read heuristic        | :white_check_mark:            | :white_check_mark:            | NA                            |
-| Indexes - read .bai/.crai       | :x:                           | :white_check_mark:            | NA                            |
-| Indexes - read .splitting-bai   | :x:                           | NA                            | NA                            |
-| Intervals                       | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
-| Partition guarantees            | :x:                           | :x:                           | NA                            |
-| Stringency                      | :white_check_mark:            | :white_check_mark:            | NA                            |
-| Testing - large files           | :x:                           | :x:                           | :x:                           |
-| Testing - samtools              | :x:                           | :x:                           | :x:                           |
+| Feature                         | BAM                           | CRAM                          | SAM                           | VCF                           |
+| ------------------------------- | ----------------------------- | ----------------------------- | ----------------------------- | ----------------------------- |
+| Filesystems - Hadoop            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
+| Filesystems - NIO               | :white_check_mark:            | :x:                           | :x:                           | :x:                           |
+| Compression                     | NA                            | NA                            | NA                            | :white_check_mark:            |
+| Multiple input files            | :white_check_mark:            | :x:                           | :x:                           | :x:                           |
+| Multiple input - header merging | :x:                           | :x:                           | :x:                           | :x:                           |
+| Sharded output                  | :x:                           | :x:                           | :x:                           | :x:                           |
+| Indexes - read heuristic        | :white_check_mark:            | :white_check_mark:            | NA                            | NA                            |
+| Indexes - read .bai/.crai       | :x:                           | :white_check_mark:            | NA                            | NA                            |
+| Indexes - read .splitting-bai   | :x:                           | NA                            | NA                            | NA                            |
+| Intervals                       | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
+| Partition guarantees            | :x:                           | :x:                           | :x:                           | NA                            |
+| Stringency                      | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | NA                            |
+| Testing - large files           | :x:                           | :x:                           | :x:                           | :x:                           |
+| Testing - samtools              | :x:                           | :x:                           | :x:                           | :x:                           |
 
 ## Features
 

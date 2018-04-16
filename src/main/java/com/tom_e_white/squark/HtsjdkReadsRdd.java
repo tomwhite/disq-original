@@ -7,8 +7,7 @@ import org.apache.spark.api.java.JavaRDD;
 /**
  * A {@link HtsjdkReadsRdd} is the distributed equivalent of a htsjdk {@link
  * htsjdk.samtools.SamReader}. It represents a SAM, BAM, or CRAM file stored in a distributed
- * filesystem (although only BAM and CRAM are supported at the moment), and encapsulates a Spark RDD
- * containing the reads in it.
+ * filesystem, and encapsulates a Spark RDD containing the reads in it.
  *
  * <p>Use a {@link HtsjdkReadsRddStorage} to read and write {@link HtsjdkReadsRdd}s.
  *

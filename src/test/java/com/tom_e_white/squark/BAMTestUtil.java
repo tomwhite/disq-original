@@ -2,6 +2,7 @@ package com.tom_e_white.squark;
 
 import htsjdk.samtools.BAMIndex;
 import htsjdk.samtools.BAMIndexer;
+import htsjdk.samtools.BamFileIoUtils;
 import htsjdk.samtools.CRAMCRAIIndexer;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileWriter;
@@ -72,7 +73,7 @@ public class BAMTestUtil {
         OutputStream out =
             new FileOutputStream(new File(bamFile.getAbsolutePath() + indexExtension));
         CRAMCRAIIndexer.writeIndex(new SeekableFileStream(bamFile), out);
-      } else {
+      } else if (extension.equals(BamFileIoUtils.BAM_FILE_EXTENSION)) {
         SamReader samReader =
             SamReaderFactory.makeDefault()
                 .enable(SamReaderFactory.Option.INCLUDE_SOURCE_IN_RECORDS)
@@ -81,6 +82,7 @@ public class BAMTestUtil {
             samReader,
             new File(bamFile.getAbsolutePath().replaceFirst(extension + "$", indexExtension)));
       }
+      // no index for SAM
     }
 
     return bamFile;

@@ -1,5 +1,6 @@
 package com.tom_e_white.squark;
 
+import com.google.common.collect.Iterators;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
@@ -9,6 +10,7 @@ import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.cram.ref.ReferenceSource;
+import htsjdk.samtools.util.IOUtil;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
 import java.io.File;
@@ -32,6 +34,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
       {"1.bam", null, ".bam", 128 * 1024, true},
       {"valid.cram", "valid.fasta", ".cram", 128 * 1024, false},
       {"valid_no_index.cram", "valid.fasta", ".cram", 128 * 1024, false},
+      {"test.sam", null, ".sam", 128 * 1024, false},
     };
   }
 
@@ -160,6 +163,36 @@ public class HtsjdkReadsRddTest extends BaseTest {
       //            new HtsjdkReadsTraversalParameters<>(null, true),
       //            ".cram", ".crai"
       //        },
+      {
+        null,
+        new HtsjdkReadsTraversalParameters<>(
+            Arrays.asList(
+                new Interval("chr21", 5000, 9999), // includes two unpaired fragments
+                new Interval("chr21", 20000, 22999)),
+            false),
+        ".sam",
+        null
+      },
+      {
+        null,
+        new HtsjdkReadsTraversalParameters<>(
+            Arrays.asList(
+                new Interval("chr21", 1, 1000135) // covers whole chromosome
+                ),
+            false),
+        ".sam",
+        null
+      },
+      {
+        null,
+        new HtsjdkReadsTraversalParameters<>(
+            Arrays.asList(
+                new Interval("chr21", 5000, 9999), // includes two unpaired fragments
+                new Interval("chr21", 20000, 22999)),
+            true),
+        ".sam",
+        null
+      },
     };
   }
 
@@ -227,6 +260,36 @@ public class HtsjdkReadsRddTest extends BaseTest {
       HtsjdkReadsTraversalParameters<T> traversalParameters)
       throws IOException {
     int recCount = 0;
+
+    if (bamFile.getName().endsWith(IOUtil.SAM_FILE_EXTENSION)) {
+      // we can't call query() on SamReader for SAM files, so we have to do interval filtering here
+      try (SamReader samReader =
+          SamReaderFactory.makeDefault()
+              .referenceSource(referenceSource)
+              .open(SamInputResource.of(bamFile))) {
+        for (SAMRecord record : samReader) {
+          if (traversalParameters == null) {
+            recCount++;
+          } else {
+            if (traversalParameters.getIntervalsForTraversal() != null) {
+              for (T interval : traversalParameters.getIntervalsForTraversal()) {
+                if (interval.overlaps(record)) {
+                  recCount++;
+                  break;
+                }
+              }
+            }
+            if (traversalParameters.getTraverseUnplacedUnmapped()
+                && record.getReadUnmappedFlag()
+                && record.getAlignmentStart() == SAMRecord.NO_ALIGNMENT_START) {
+              recCount++;
+            }
+          }
+        }
+      }
+      return recCount;
+    }
+
     try (SamReader bamReader =
         SamReaderFactory.makeDefault()
             .referenceSource(referenceSource)
@@ -244,10 +307,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
                 traversalParameters.getIntervalsForTraversal(), sequenceDictionary);
         it = bamReader.queryOverlapping(queryIntervals);
       }
-      while (it.hasNext()) {
-        it.next();
-        recCount++;
-      }
+      recCount += Iterators.size(it);
     }
 
     if (traversalParameters != null && traversalParameters.getTraverseUnplacedUnmapped()) {
@@ -256,10 +316,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
               .referenceSource(referenceSource)
               .open(SamInputResource.of(bamFile))) {
         Iterator<SAMRecord> it = bamReader.queryUnmapped();
-        while (it.hasNext()) {
-          it.next();
-          recCount++;
-        }
+        recCount += Iterators.size(it);
       }
     }
 

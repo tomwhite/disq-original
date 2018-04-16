@@ -3,13 +3,13 @@ package com.tom_e_white.squark.impl.formats.cram;
 import com.google.common.collect.Iterators;
 import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.FileSplitInputFormat;
-import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
+import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import htsjdk.samtools.AbstractBAMFileIndex;
 import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
@@ -23,13 +23,12 @@ import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMSequenceDictionary;
-import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
-import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.cram.CRAIEntry;
 import htsjdk.samtools.cram.CRAIIndex;
+import htsjdk.samtools.cram.build.CramIO;
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.cram.structure.Container;
 import htsjdk.samtools.seekablestream.SeekableStream;
@@ -40,7 +39,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
+import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
@@ -50,40 +49,13 @@ import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.broadcast.Broadcast;
 import scala.Tuple2;
 
-// TODO: remove duplication with BamSource
-public class CramSource implements Serializable {
+public class CramSource extends AbstractSamSource implements Serializable {
 
-  private final FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
-
-  public SAMFileHeader getFileHeader(
-      JavaSparkContext jsc,
-      String path,
-      ValidationStringency stringency,
-      String referenceSourcePath)
-      throws IOException {
-    // TODO: support header merging
-    Configuration conf = jsc.hadoopConfiguration();
-    String firstBamPath;
-    if (fileSystemWrapper.isDirectory(conf, path)) {
-      Optional<String> firstPath =
-          fileSystemWrapper
-              .listDirectory(conf, path)
-              .stream()
-              .filter(f -> !(f.startsWith(".") || f.startsWith("_")))
-              .findFirst();
-      if (!firstPath.isPresent()) {
-        throw new IllegalArgumentException("No files found in " + path);
-      }
-      firstBamPath = firstPath.get();
-    } else {
-      firstBamPath = path;
-    }
-    try (SamReader samReader =
-        createSamReader(conf, firstBamPath, stringency, referenceSourcePath)) {
-      return samReader.getFileHeader();
-    }
+  public CramSource() {
+    super(new HadoopFileSystemWrapper());
   }
 
+  @Override
   public <T extends Locatable> JavaRDD<SAMRecord> getReads(
       JavaSparkContext jsc,
       String path,
@@ -255,40 +227,18 @@ public class CramSource implements Serializable {
     return (CRAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
   }
 
-  private SeekableStream findIndex(Configuration conf, String path) throws IOException {
-    String index = path + ".crai";
+  @Override
+  protected SeekableStream findIndex(Configuration conf, String path) throws IOException {
+    String index = path + CRAIIndex.CRAI_INDEX_SUFFIX;
     if (fileSystemWrapper.exists(conf, index)) {
       return fileSystemWrapper.open(conf, index);
     }
-    index = path.replaceFirst("\\.cram$", ".crai");
+    index =
+        path.replaceFirst(
+            Pattern.quote(CramIO.CRAM_FILE_EXTENSION) + "$", CRAIIndex.CRAI_INDEX_SUFFIX);
     if (fileSystemWrapper.exists(conf, index)) {
       return fileSystemWrapper.open(conf, index);
     }
     return null;
-  }
-
-  private SamReader createSamReader(
-      Configuration conf, String path, ValidationStringency stringency, String referenceSourcePath)
-      throws IOException {
-    SeekableStream in = fileSystemWrapper.open(conf, path);
-    SeekableStream indexStream = findIndex(conf, path);
-    SamReaderFactory readerFactory =
-        SamReaderFactory.makeDefault()
-            .setOption(SamReaderFactory.Option.CACHE_FILE_BASED_INDEXES, true)
-            .setOption(SamReaderFactory.Option.EAGERLY_DECODE, false)
-            .setUseAsyncIo(false);
-    if (stringency != null) {
-      readerFactory.validationStringency(stringency);
-    }
-    if (referenceSourcePath != null) {
-      // TODO: should go through FileSystemWrapper
-      readerFactory.referenceSource(
-          new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath)));
-    }
-    SamInputResource resource = SamInputResource.of(in);
-    if (indexStream != null) {
-      resource.index(indexStream);
-    }
-    return readerFactory.open(resource);
   }
 }

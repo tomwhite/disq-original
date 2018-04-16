@@ -3,7 +3,6 @@ package com.tom_e_white.squark.impl.formats.bam;
 import com.google.common.collect.Iterators;
 import com.tom_e_white.squark.HtsjdkReadsRdd;
 import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
-import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
@@ -12,19 +11,19 @@ import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockGuesser.BgzfBlock;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockSource;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
+import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import htsjdk.samtools.AbstractBAMFileIndex;
 import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
 import htsjdk.samtools.BAMIndex;
+import htsjdk.samtools.BamFileIoUtils;
 import htsjdk.samtools.Chunk;
 import htsjdk.samtools.ExtSeekableBufferedStream;
 import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
-import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Locatable;
@@ -32,7 +31,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.Optional;
+import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -45,12 +44,11 @@ import org.apache.spark.broadcast.Broadcast;
  * @see BamSink
  * @see HtsjdkReadsRdd
  */
-public class BamSource implements Serializable {
+public class BamSource extends AbstractSamSource implements Serializable {
 
   private static final int MAX_READ_SIZE = 10_000_000;
 
   private final BgzfBlockSource bgzfBlockSource;
-  private final FileSystemWrapper fileSystemWrapper;
 
   public BamSource() {
     this(false);
@@ -61,32 +59,8 @@ public class BamSource implements Serializable {
    *     is appropriate for cloud stores where file locality is not relied upon.
    */
   public BamSource(boolean useNio) {
+    super(useNio ? new NioFileSystemWrapper() : new HadoopFileSystemWrapper());
     this.bgzfBlockSource = new BgzfBlockSource(useNio);
-    this.fileSystemWrapper = useNio ? new NioFileSystemWrapper() : new HadoopFileSystemWrapper();
-  }
-
-  public SAMFileHeader getFileHeader(
-      JavaSparkContext jsc, String path, ValidationStringency stringency) throws IOException {
-    // TODO: support header merging
-    Configuration conf = jsc.hadoopConfiguration();
-    String firstBamPath;
-    if (fileSystemWrapper.isDirectory(conf, path)) {
-      Optional<String> firstPath =
-          fileSystemWrapper
-              .listDirectory(conf, path)
-              .stream()
-              .filter(f -> !(f.startsWith(".") || f.startsWith("_")))
-              .findFirst();
-      if (!firstPath.isPresent()) {
-        throw new IllegalArgumentException("No files found in " + path);
-      }
-      firstBamPath = firstPath.get();
-    } else {
-      firstBamPath = path;
-    }
-    try (SamReader samReader = createSamReader(conf, firstBamPath, stringency)) {
-      return samReader.getFileHeader();
-    }
   }
 
   /**
@@ -94,7 +68,10 @@ public class BamSource implements Serializable {
    *     long reads, and/or very small partitions).
    */
   private <T extends Locatable> ReadRange getFirstReadInPartition(
-      Configuration conf, Iterator<BgzfBlock> bgzfBlocks, ValidationStringency stringency)
+      Configuration conf,
+      Iterator<BgzfBlock> bgzfBlocks,
+      ValidationStringency stringency,
+      String referenceSourcePath)
       throws IOException {
     ReadRange readRange = null;
     BamRecordGuesser bamRecordGuesser = null;
@@ -105,7 +82,8 @@ public class BamSource implements Serializable {
         BgzfBlock block = bgzfBlocks.next();
         if (partitionPath == null) { // assume each partition comes from only a single file path
           partitionPath = block.path;
-          try (SamReader samReader = createSamReader(conf, partitionPath, stringency)) {
+          try (SamReader samReader =
+              createSamReader(conf, partitionPath, stringency, referenceSourcePath)) {
             SAMFileHeader header = samReader.getFileHeader();
             bamRecordGuesser = getBamRecordGuesser(conf, partitionPath, header);
           }
@@ -140,23 +118,18 @@ public class BamSource implements Serializable {
     return new BamRecordGuesser(ss, header.getSequenceDictionary().size(), header);
   }
 
-  /** @return an RDD of reads. */
-  public JavaRDD<SAMRecord> getReads(
-      JavaSparkContext jsc, String path, int splitSize, ValidationStringency stringency)
-      throws IOException {
-    return getReads(jsc, path, splitSize, null, stringency);
-  }
-
   /**
    * @return an RDD of reads for a bounded traversal (intervals and whether to return unplaced,
    *     unmapped reads).
    */
+  @Override
   public <T extends Locatable> JavaRDD<SAMRecord> getReads(
       JavaSparkContext jsc,
       String path,
       int splitSize,
       HtsjdkReadsTraversalParameters<T> traversalParameters,
-      ValidationStringency stringency)
+      ValidationStringency stringency,
+      String referenceSourcePath)
       throws IOException {
     if (traversalParameters != null
         && traversalParameters.getIntervalsForTraversal() == null
@@ -175,12 +148,13 @@ public class BamSource implements Serializable {
             (FlatMapFunction<Iterator<BgzfBlock>, SAMRecord>)
                 bgzfBlocks -> {
                   Configuration conf = confSer.getConf();
-                  ReadRange readRange = getFirstReadInPartition(conf, bgzfBlocks, stringency);
+                  ReadRange readRange =
+                      getFirstReadInPartition(conf, bgzfBlocks, stringency, referenceSourcePath);
                   if (readRange == null) {
                     return Collections.emptyIterator();
                   }
                   String p = readRange.getPath();
-                  SamReader samReader = createSamReader(conf, p, stringency);
+                  SamReader samReader = createSamReader(conf, p, stringency, referenceSourcePath);
                   SAMFileHeader header = samReader.getFileHeader();
                   BAMFileReader bamFileReader = createBamFileReader(samReader);
                   BAMFileSpan splitSpan = new BAMFileSpan(readRange.getSpan());
@@ -225,7 +199,7 @@ public class BamSource implements Serializable {
                             && unplacedUnmappedStart
                                 < readRange.getSpan().getChunkEnd()) { // TODO correct?
                           SamReader unplacedUnmappedReadsSamReader =
-                              createSamReader(conf, p, stringency);
+                              createSamReader(conf, p, stringency, referenceSourcePath);
                           Iterator<SAMRecord> unplacedUnmappedReadsIterator =
                               new AutocloseIteratorWrapper<>(
                                   createBamFileReader(unplacedUnmappedReadsSamReader)
@@ -255,35 +229,19 @@ public class BamSource implements Serializable {
     return bamFileReader;
   }
 
-  private SeekableStream findIndex(Configuration conf, String path) throws IOException {
-    String index = path + ".bai";
+  @Override
+  protected SeekableStream findIndex(Configuration conf, String path) throws IOException {
+    String index = path + BAMIndex.BAMIndexSuffix;
     if (fileSystemWrapper.exists(conf, index)) {
       return fileSystemWrapper.open(conf, index);
     }
-    index = path.replaceFirst("\\.bam$", ".bai");
+    index =
+        path.replaceFirst(
+            Pattern.quote(BamFileIoUtils.BAM_FILE_EXTENSION) + "$", BAMIndex.BAMIndexSuffix);
     if (fileSystemWrapper.exists(conf, index)) {
       return fileSystemWrapper.open(conf, index);
     }
     return null;
-  }
-
-  private SamReader createSamReader(
-      Configuration conf, String path, ValidationStringency stringency) throws IOException {
-    SeekableStream in = fileSystemWrapper.open(conf, path);
-    SeekableStream indexStream = findIndex(conf, path);
-    SamReaderFactory readerFactory =
-        SamReaderFactory.makeDefault()
-            .setOption(SamReaderFactory.Option.CACHE_FILE_BASED_INDEXES, true)
-            .setOption(SamReaderFactory.Option.EAGERLY_DECODE, false)
-            .setUseAsyncIo(false);
-    if (stringency != null) {
-      readerFactory.validationStringency(stringency);
-    }
-    SamInputResource resource = SamInputResource.of(in);
-    if (indexStream != null) {
-      resource.index(indexStream);
-    }
-    return readerFactory.open(resource);
   }
 
   /**
