@@ -19,19 +19,19 @@ See discussion below for details on each feature.
 | Feature                         | BAM                           | CRAM                          | VCF                           |
 | ------------------------------- | ----------------------------- | ----------------------------- | ----------------------------- |
 | Filesystems - Hadoop            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
-| Filesystems - NIO               | :white_check_mark:            | :negative_squared_cross_mark: | :negative_squared_cross_mark: |
+| Filesystems - NIO               | :white_check_mark:            | :x:                           | :x:                           |
 | Compression                     | NA                            | NA                            | :white_check_mark:            |
-| Multiple input files            | :white_check_mark:            | :white_check_mark:            | :negative_squared_cross_mark: |
-| Multiple input - header merging | :negative_squared_cross_mark: | :negative_squared_cross_mark: | :negative_squared_cross_mark: |
-| Sharded output                  | :negative_squared_cross_mark: | :negative_squared_cross_mark: | :negative_squared_cross_mark: |
+| Multiple input files            | :white_check_mark:            | :white_check_mark:            | :x:                           |
+| Multiple input - header merging | :x:                           | :x:                           | :x:                           |
+| Sharded output                  | :x:                           | :x:                           | :x:                           |
 | Indexes - read heuristic        | :white_check_mark:            | :white_check_mark:            | NA                            |
-| Indexes - read .bai/.crai       | :negative_squared_cross_mark: | :white_check_mark:            | NA                            |
-| Indexes - read .splitting-bai   | :negative_squared_cross_mark: | NA                            | NA                            |
-| Intervals                       | :white_check_mark:            | :white_check_mark:            | :negative_squared_cross_mark: |
-| Partition guarantees            | :negative_squared_cross_mark: | :negative_squared_cross_mark: | NA                            |
+| Indexes - read .bai/.crai       | :x:                           | :white_check_mark:            | NA                            |
+| Indexes - read .splitting-bai   | :x:                           | NA                            | NA                            |
+| Intervals                       | :white_check_mark:            | :white_check_mark:            | :x:                           |
+| Partition guarantees            | :x:                           | :x:                           | NA                            |
 | Stringency                      | :white_check_mark:            | :white_check_mark:            | NA                            |
-| Testing - large files           | :negative_squared_cross_mark: | :negative_squared_cross_mark: | :negative_squared_cross_mark: |
-| Testing - samtools              | :negative_squared_cross_mark: | :negative_squared_cross_mark: | :negative_squared_cross_mark: |
+| Testing - large files           | :x:                           | :x:                           | :x:                           |
+| Testing - samtools              | :x:                           | :x:                           | :x:                           |
 
 ## Features
 
