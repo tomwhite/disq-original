@@ -1,6 +1,7 @@
 package com.tom_e_white.squark;
 
 import com.tom_e_white.squark.impl.formats.vcf.VcfSink;
+import com.tom_e_white.squark.impl.formats.vcf.VcfSinkMultiple;
 import com.tom_e_white.squark.impl.formats.vcf.VcfSource;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.VariantContext;
@@ -43,7 +44,18 @@ public class HtsjdkVariantsRddStorage {
   }
 
   public void write(HtsjdkVariantsRdd htsjdkVariantsRdd, String path) throws IOException {
-    new VcfSink()
-        .save(sparkContext, htsjdkVariantsRdd.getHeader(), htsjdkVariantsRdd.getVariants(), path);
+    if (path.endsWith(".vcfs") || path.endsWith(".vcfs/")) {
+      new VcfSinkMultiple(".vcf")
+          .save(sparkContext, htsjdkVariantsRdd.getHeader(), htsjdkVariantsRdd.getVariants(), path);
+    } else if (path.endsWith(".vcf.gzs") || path.endsWith(".vcf.gzs/")) {
+      new VcfSinkMultiple(".vcf.gz")
+          .save(sparkContext, htsjdkVariantsRdd.getHeader(), htsjdkVariantsRdd.getVariants(), path);
+    } else if (path.endsWith(".vcf.bgzs") || path.endsWith(".vcf.bgzs/")) {
+      new VcfSinkMultiple(".vcf.bgz")
+          .save(sparkContext, htsjdkVariantsRdd.getHeader(), htsjdkVariantsRdd.getVariants(), path);
+    } else {
+      new VcfSink()
+          .save(sparkContext, htsjdkVariantsRdd.getHeader(), htsjdkVariantsRdd.getVariants(), path);
+    }
   }
 }

@@ -36,9 +36,9 @@ public abstract class AbstractSamSource implements Serializable {
       ValidationStringency stringency,
       String referenceSourcePath)
       throws IOException {
-    // TODO: support header merging
+    // TODO: support multiple headers
     Configuration conf = jsc.hadoopConfiguration();
-    String firstBamPath;
+    String firstSamPath;
     if (fileSystemWrapper.isDirectory(conf, path)) {
       Optional<String> firstPath =
           fileSystemWrapper
@@ -49,12 +49,12 @@ public abstract class AbstractSamSource implements Serializable {
       if (!firstPath.isPresent()) {
         throw new IllegalArgumentException("No files found in " + path);
       }
-      firstBamPath = firstPath.get();
+      firstSamPath = firstPath.get();
     } else {
-      firstBamPath = path;
+      firstSamPath = path;
     }
     try (SamReader samReader =
-        createSamReader(conf, firstBamPath, stringency, referenceSourcePath)) {
+        createSamReader(conf, firstSamPath, stringency, referenceSourcePath)) {
       return samReader.getFileHeader();
     }
   }

@@ -1,5 +1,6 @@
 package com.tom_e_white.squark.impl.formats.sam;
 
+import com.tom_e_white.squark.HtsjdkReadsRdd;
 import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.Merger;
@@ -12,6 +13,13 @@ import java.io.Writer;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 
+/**
+ * Write reads to a single SAM file on Spark. This is done by writing to multiple headerless SAM
+ * files in parallel, then merging the resulting files into a single SAM file.
+ *
+ * @see SamSource
+ * @see HtsjdkReadsRdd
+ */
 public class SamSink {
 
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();

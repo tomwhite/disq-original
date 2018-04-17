@@ -12,14 +12,6 @@ public class SerializableHadoopConfiguration implements Serializable {
 
   public SerializableHadoopConfiguration(Configuration hadoopConf) {
     this.conf = hadoopConf;
-
-    if (this.conf == null) {
-      this.conf = new Configuration();
-    }
-  }
-
-  public SerializableHadoopConfiguration() {
-    this.conf = new Configuration();
   }
 
   public Configuration getConf() {

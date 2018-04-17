@@ -5,8 +5,10 @@ import com.tom_e_white.squark.impl.formats.bam.BamSource;
 import com.tom_e_white.squark.impl.formats.cram.CramSink;
 import com.tom_e_white.squark.impl.formats.cram.CramSource;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
+import com.tom_e_white.squark.impl.formats.sam.AnySamSinkMultiple;
 import com.tom_e_white.squark.impl.formats.sam.SamSink;
 import com.tom_e_white.squark.impl.formats.sam.SamSource;
+import htsjdk.samtools.BamFileIoUtils;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.ValidationStringency;
@@ -94,6 +96,15 @@ public class HtsjdkReadsRddStorage {
               referenceSourcePath);
     } else if (path.endsWith(IOUtil.SAM_FILE_EXTENSION)) {
       new SamSink().save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
+    } else if (path.endsWith(".bams") || path.endsWith(".bams/")) {
+      new AnySamSinkMultiple(BamFileIoUtils.BAM_FILE_EXTENSION)
+          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
+    } else if (path.endsWith(".crams") || path.endsWith(".crams/")) {
+      new AnySamSinkMultiple(CramIO.CRAM_FILE_EXTENSION)
+          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
+    } else if (path.endsWith(".sams") || path.endsWith(".sams/")) {
+      new AnySamSinkMultiple(IOUtil.SAM_FILE_EXTENSION)
+          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
     } else {
       new BamSink().save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
     }

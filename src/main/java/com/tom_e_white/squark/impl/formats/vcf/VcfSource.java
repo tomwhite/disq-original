@@ -26,6 +26,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import java.util.zip.GZIPInputStream;
@@ -47,7 +48,24 @@ public class VcfSource implements Serializable {
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
 
   public VCFHeader getFileHeader(JavaSparkContext jsc, String path) throws IOException {
-    try (SeekableStream headerIn = fileSystemWrapper.open(jsc.hadoopConfiguration(), path)) {
+    Configuration conf = jsc.hadoopConfiguration();
+    String firstVcfPath;
+    if (fileSystemWrapper.isDirectory(conf, path)) {
+      Optional<String> firstPath =
+          fileSystemWrapper
+              .listDirectory(conf, path)
+              .stream()
+              .filter(f -> !(f.startsWith(".") || f.startsWith("_")))
+              .findFirst();
+      if (!firstPath.isPresent()) {
+        throw new IllegalArgumentException("No files found in " + path);
+      }
+      firstVcfPath = firstPath.get();
+    } else {
+      firstVcfPath = path;
+    }
+    try (SeekableStream headerIn =
+        fileSystemWrapper.open(jsc.hadoopConfiguration(), firstVcfPath)) {
       BufferedInputStream bis = new BufferedInputStream(headerIn);
       // despite the name, isGzippedSAMFile looks for any gzipped stream
       InputStream is = SamStreams.isGzippedSAMFile(bis) ? new GZIPInputStream(bis) : bis;

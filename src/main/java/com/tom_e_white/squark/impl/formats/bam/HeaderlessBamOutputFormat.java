@@ -15,11 +15,13 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 /**
- * An output format for writing {@link SAMRecord} objects to BAM files. Should not be used directly.
+ * An output format for writing {@link SAMRecord} objects to BAM files that don't have a header (or
+ * terminator), so they can be merged into a single file easily. Files do not have the usual ".bam"
+ * extension since they are not complete BAM files. This class should not be used directly.
  *
  * @see HtsjdkReadsRdd
  */
-public class BamOutputFormat extends FileOutputFormat<Void, SAMRecord> {
+public class HeaderlessBamOutputFormat extends FileOutputFormat<Void, SAMRecord> {
 
   static class BamRecordWriter extends RecordWriter<Void, SAMRecord> {
 

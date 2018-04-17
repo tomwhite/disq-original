@@ -63,6 +63,44 @@ public class HtsjdkVariantsRddTest extends BaseTest {
     Assert.assertEquals(expectedCount, getVariantCount(outputFile, null));
   }
 
+  private Object[] parametersForTestReadAndWriteMultiple() {
+    return new Object[][] {
+      {"HiSeq.10000.vcf.bgz", ".vcfs", 128 * 1024},
+      {"HiSeq.10000.vcf.bgz", ".vcf.gzs", 128 * 1024},
+      {"HiSeq.10000.vcf.bgz", ".vcf.bgzs", 128 * 1024},
+    };
+  }
+
+  @Test
+  @Parameters
+  public void testReadAndWriteMultiple(String inputFile, String outputExtension, int splitSize)
+      throws IOException, URISyntaxException {
+    String inputPath = ClassLoader.getSystemClassLoader().getResource(inputFile).toURI().toString();
+
+    HtsjdkVariantsRddStorage htsjdkVariantsRddStorage =
+        HtsjdkVariantsRddStorage.makeDefault(jsc).splitSize(splitSize);
+
+    HtsjdkVariantsRdd htsjdkVariantsRdd = htsjdkVariantsRddStorage.read(inputPath);
+
+    Assert.assertTrue(htsjdkVariantsRdd.getVariants().getNumPartitions() > 1);
+
+    int expectedCount = getVariantCount(new File(inputPath.replace("file:", "")), null);
+    Assert.assertEquals(expectedCount, htsjdkVariantsRdd.getVariants().count());
+
+    File outputFile = File.createTempFile("test", outputExtension);
+    outputFile.delete();
+    String outputPath = outputFile.toURI().toString();
+
+    htsjdkVariantsRddStorage.write(htsjdkVariantsRdd, outputPath);
+
+    Assert.assertTrue(outputFile.isDirectory());
+    int totalCount = 0;
+    for (File part : outputFile.listFiles(file -> file.getName().startsWith("part-"))) {
+      totalCount += getVariantCount(part, null);
+    }
+    Assert.assertEquals(expectedCount, totalCount);
+  }
+
   private Object[] parametersForTestBgzfVcfIsSplitIntoMultiplePartitions() {
     return new Object[][] {
       {"HiSeq.10000.vcf.bgz", null, 4},

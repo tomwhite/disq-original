@@ -21,7 +21,8 @@ import org.apache.spark.broadcast.Broadcast;
 import scala.Tuple2;
 
 /**
- * Write reads to a CRAM file on Spark.
+ * Write reads to a single CRAM file on Spark. This is done by writing to multiple headerless CRAM
+ * files in parallel, then merging the resulting files into a single CRAM file.
  *
  * @see CramSource
  * @see HtsjdkReadsRdd

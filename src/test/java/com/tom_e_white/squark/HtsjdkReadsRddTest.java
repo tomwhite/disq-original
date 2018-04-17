@@ -1,6 +1,5 @@
 package com.tom_e_white.squark;
 
-import com.google.common.collect.Iterators;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
@@ -74,6 +73,44 @@ public class HtsjdkReadsRddTest extends BaseTest {
     htsjdkReadsRddStorage.write(htsjdkReadsRdd, outputPath);
 
     Assert.assertEquals(expectedCount, getBAMRecordCount(outputFile, referenceSource));
+  }
+
+  private Object[] parametersForTestReadAndWriteMultiple() {
+    return new Object[][] {
+      {".bams", false},
+      {".crams", false},
+      {".sams", false},
+    };
+  }
+
+  @Test
+  @Parameters
+  public void testReadAndWriteMultiple(String outputExtension, boolean useNio) throws IOException {
+
+    String inputPath =
+        BAMTestUtil.writeBamFile(1000, SAMFileHeader.SortOrder.coordinate).toURI().toString();
+    HtsjdkReadsRddStorage htsjdkReadsRddStorage =
+        HtsjdkReadsRddStorage.makeDefault(jsc).splitSize(40000).useNio(false);
+
+    HtsjdkReadsRdd htsjdkReadsRdd = htsjdkReadsRddStorage.read(inputPath);
+
+    Assert.assertTrue(htsjdkReadsRdd.getReads().getNumPartitions() > 1);
+
+    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")), null);
+    Assert.assertEquals(expectedCount, htsjdkReadsRdd.getReads().count());
+
+    File outputFile = File.createTempFile("test", outputExtension);
+    outputFile.delete();
+    String outputPath = outputFile.toURI().toString();
+
+    htsjdkReadsRddStorage.write(htsjdkReadsRdd, outputPath);
+
+    Assert.assertTrue(outputFile.isDirectory());
+    int totalCount = 0;
+    for (File part : outputFile.listFiles(file -> file.getName().startsWith("part-"))) {
+      totalCount += getBAMRecordCount(part, null);
+    }
+    Assert.assertEquals(expectedCount, totalCount);
   }
 
   @Test
@@ -268,6 +305,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
               .referenceSource(referenceSource)
               .open(SamInputResource.of(bamFile))) {
         for (SAMRecord record : samReader) {
+          Assert.assertNotNull(record.getHeader());
           if (traversalParameters == null) {
             recCount++;
           } else {
@@ -307,7 +345,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
                 traversalParameters.getIntervalsForTraversal(), sequenceDictionary);
         it = bamReader.queryOverlapping(queryIntervals);
       }
-      recCount += Iterators.size(it);
+      recCount += size(it);
     }
 
     if (traversalParameters != null && traversalParameters.getTraverseUnplacedUnmapped()) {
@@ -316,10 +354,20 @@ public class HtsjdkReadsRddTest extends BaseTest {
               .referenceSource(referenceSource)
               .open(SamInputResource.of(bamFile))) {
         Iterator<SAMRecord> it = bamReader.queryUnmapped();
-        recCount += Iterators.size(it);
+        recCount += size(it);
       }
     }
 
     return recCount;
+  }
+
+  private static int size(Iterator<SAMRecord> iterator) {
+    int count = 0;
+    while (iterator.hasNext()) {
+      SAMRecord next = iterator.next();
+      Assert.assertNotNull(next.getHeader());
+      count++;
+    }
+    return count;
   }
 }

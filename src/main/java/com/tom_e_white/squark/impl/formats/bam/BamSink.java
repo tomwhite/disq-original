@@ -21,7 +21,8 @@ import org.apache.spark.broadcast.Broadcast;
 import scala.Tuple2;
 
 /**
- * Write reads to a BAM file on Spark.
+ * Write reads to a single BAM file on Spark. This is done by writing to multiple headerless BAM
+ * files in parallel, then merging the resulting files into a single BAM file.
  *
  * @see BamSource
  * @see HtsjdkReadsRdd
@@ -39,7 +40,7 @@ public class BamSink {
     reads
         .mapPartitions(
             readIterator -> {
-              BamOutputFormat.setHeader(headerBroadcast.getValue());
+              HeaderlessBamOutputFormat.setHeader(headerBroadcast.getValue());
               return readIterator;
             })
         .mapToPair(
@@ -48,7 +49,7 @@ public class BamSink {
             shardedDir,
             Void.class,
             SAMRecord.class,
-            BamOutputFormat.class,
+            HeaderlessBamOutputFormat.class,
             jsc.hadoopConfiguration());
 
     String headerFile = shardedDir + "/header";
