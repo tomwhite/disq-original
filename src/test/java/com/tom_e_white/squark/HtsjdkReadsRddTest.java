@@ -45,25 +45,21 @@ public class HtsjdkReadsRddTest extends BaseTest {
       String outputExtension,
       int splitSize,
       boolean useNio)
-      throws IOException, URISyntaxException {
+      throws Exception {
     String inputPath = ClassLoader.getSystemClassLoader().getResource(inputFile).toURI().toString();
 
     HtsjdkReadsRddStorage htsjdkReadsRddStorage =
         HtsjdkReadsRddStorage.makeDefault(jsc).splitSize(splitSize).useNio(useNio);
-    ReferenceSource referenceSource = null;
+    File refFile = null;
     if (cramReferenceFile != null) {
-      String cramReferencePath =
-          ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI().toString();
+      refFile = new File(ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI());
+      String cramReferencePath = refFile.toString();
       htsjdkReadsRddStorage.referenceSourcePath(cramReferencePath);
-      referenceSource =
-          new ReferenceSource(
-              new File(ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI()));
     }
 
     HtsjdkReadsRdd htsjdkReadsRdd = htsjdkReadsRddStorage.read(inputPath);
 
-    int expectedCount =
-        getBAMRecordCount(new File(inputPath.replace("file:", "")), referenceSource);
+    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")), refFile);
     Assert.assertEquals(expectedCount, htsjdkReadsRdd.getReads().count());
 
     File outputFile = File.createTempFile("test", outputExtension);
@@ -72,7 +68,10 @@ public class HtsjdkReadsRddTest extends BaseTest {
 
     htsjdkReadsRddStorage.write(htsjdkReadsRdd, outputPath);
 
-    Assert.assertEquals(expectedCount, getBAMRecordCount(outputFile, referenceSource));
+    Assert.assertEquals(expectedCount, getBAMRecordCount(outputFile, refFile));
+    if (SamtoolsTestUtil.isSamtoolsAvailable()) {
+      Assert.assertEquals(expectedCount, SamtoolsTestUtil.countReads(outputFile, refFile));
+    }
   }
 
   private Object[] parametersForTestReadAndWriteMultiple() {
@@ -85,7 +84,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
 
   @Test
   @Parameters
-  public void testReadAndWriteMultiple(String outputExtension, boolean useNio) throws IOException {
+  public void testReadAndWriteMultiple(String outputExtension, boolean useNio) throws Exception {
 
     String inputPath =
         BAMTestUtil.writeBamFile(1000, SAMFileHeader.SortOrder.coordinate).toURI().toString();
@@ -106,11 +105,20 @@ public class HtsjdkReadsRddTest extends BaseTest {
     htsjdkReadsRddStorage.write(htsjdkReadsRdd, outputPath);
 
     Assert.assertTrue(outputFile.isDirectory());
+
     int totalCount = 0;
     for (File part : outputFile.listFiles(file -> file.getName().startsWith("part-"))) {
       totalCount += getBAMRecordCount(part, null);
     }
     Assert.assertEquals(expectedCount, totalCount);
+
+    if (SamtoolsTestUtil.isSamtoolsAvailable()) {
+      int totalCountSamtools = 0;
+      for (File part : outputFile.listFiles(file -> file.getName().startsWith("part-"))) {
+        totalCountSamtools += SamtoolsTestUtil.countReads(part, null);
+      }
+      Assert.assertEquals(expectedCount, totalCountSamtools);
+    }
   }
 
   @Test
@@ -244,16 +252,11 @@ public class HtsjdkReadsRddTest extends BaseTest {
     HtsjdkReadsRddStorage htsjdkReadsRddStorage =
         HtsjdkReadsRddStorage.makeDefault(jsc).splitSize(40000).useNio(false);
 
-    ReferenceSource referenceSource = null;
     File refFile = null;
     if (cramReferenceFile != null) {
       refFile = new File(ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI());
-      String cramReferencePath =
-          ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI().toString();
+      String cramReferencePath = refFile.toString();
       htsjdkReadsRddStorage.referenceSourcePath(cramReferencePath);
-      referenceSource =
-          new ReferenceSource(
-              new File(ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI()));
     }
 
     String inputPath =
@@ -264,11 +267,18 @@ public class HtsjdkReadsRddTest extends BaseTest {
 
     HtsjdkReadsRdd htsjdkReadsRdd = htsjdkReadsRddStorage.read(inputPath, traversalParameters);
 
-    int expectedCount =
-        getBAMRecordCount(
-            new File(inputPath.replace("file:", "")), referenceSource, traversalParameters);
+    File inputFile = new File(inputPath.replace("file:", ""));
 
+    int expectedCount = getBAMRecordCount(inputFile, refFile, traversalParameters);
     Assert.assertEquals(expectedCount, htsjdkReadsRdd.getReads().count());
+
+    if (SamtoolsTestUtil.isSamtoolsAvailable()
+        && !extension.equals(
+            IOUtil.SAM_FILE_EXTENSION)) { // samtools can't process intervals for SAM
+      int expectedCountSamtools =
+          SamtoolsTestUtil.countReads(inputFile, refFile, traversalParameters);
+      Assert.assertEquals(expectedCountSamtools, htsjdkReadsRdd.getReads().count());
+    }
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -286,16 +296,15 @@ public class HtsjdkReadsRddTest extends BaseTest {
     return getBAMRecordCount(bamFile, null);
   }
 
-  private static int getBAMRecordCount(final File bamFile, ReferenceSource referenceSource)
-      throws IOException {
-    return getBAMRecordCount(bamFile, referenceSource, null);
+  private static int getBAMRecordCount(final File bamFile, File refFile) throws IOException {
+    return getBAMRecordCount(bamFile, refFile, null);
   }
 
   private static <T extends Locatable> int getBAMRecordCount(
-      final File bamFile,
-      ReferenceSource referenceSource,
-      HtsjdkReadsTraversalParameters<T> traversalParameters)
+      final File bamFile, File refFile, HtsjdkReadsTraversalParameters<T> traversalParameters)
       throws IOException {
+
+    ReferenceSource referenceSource = refFile == null ? null : new ReferenceSource(refFile);
     int recCount = 0;
 
     if (bamFile.getName().endsWith(IOUtil.SAM_FILE_EXTENSION)) {

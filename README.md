@@ -31,7 +31,7 @@ below for details on each feature.
 | Partition guarantees            | :x:                           | NA                            | :x:                           | NA                            |
 | Stringency                      | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | NA                            |
 | Testing - large files           | :x:                           | :x:                           | :x:                           | :x:                           |
-| Testing - samtools              | :x:                           | :x:                           | :x:                           | :x:                           |
+| Testing - samtools and bcftools | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 
 ## Features
 
@@ -140,5 +140,7 @@ For reading BAM/CRAM/SAM, the stringency settings from htsjdk are supported.
 
 All read and write paths are tested on real files from the field (multi-GB in size).
 
-Samtools is used to verify that files written with this library can be read successfully.
+[Samtools and Bcftools](http://www.htslib.org/download/) are used to verify that files written with this library can be
+read successfully. (Version 1.4 of samtools, and 1.3 of bcftools were used. The latter was needed to avoid
+[this bug](https://github.com/samtools/bcftools/issues/420).)
 

@@ -61,6 +61,9 @@ public class HtsjdkVariantsRddTest extends BaseTest {
       Assert.assertFalse("block compressed", isBlockCompressed(outputFile));
     }
     Assert.assertEquals(expectedCount, getVariantCount(outputFile, null));
+    if (BcftoolsTestUtil.isBcftoolsAvailable()) {
+      Assert.assertEquals(expectedCount, BcftoolsTestUtil.countVariants(outputFile));
+    }
   }
 
   private Object[] parametersForTestReadAndWriteMultiple() {
@@ -94,11 +97,20 @@ public class HtsjdkVariantsRddTest extends BaseTest {
     htsjdkVariantsRddStorage.write(htsjdkVariantsRdd, outputPath);
 
     Assert.assertTrue(outputFile.isDirectory());
+
     int totalCount = 0;
     for (File part : outputFile.listFiles(file -> file.getName().startsWith("part-"))) {
       totalCount += getVariantCount(part, null);
     }
     Assert.assertEquals(expectedCount, totalCount);
+
+    if (BcftoolsTestUtil.isBcftoolsAvailable()) {
+      int totalCountSamtools = 0;
+      for (File part : outputFile.listFiles(file -> file.getName().startsWith("part-"))) {
+        totalCountSamtools += BcftoolsTestUtil.countVariants(part);
+      }
+      Assert.assertEquals(expectedCount, totalCountSamtools);
+    }
   }
 
   private Object[] parametersForTestBgzfVcfIsSplitIntoMultiplePartitions() {
