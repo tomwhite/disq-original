@@ -4,6 +4,7 @@ import htsjdk.samtools.util.Locatable;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.PumpStreamHandler;
@@ -30,15 +31,17 @@ public class BcftoolsTestUtil {
     return System.getProperty(BCFTOOLS_BIN_PROPERTY);
   }
 
-  public static <T extends Locatable> int countVariants(File file) throws IOException {
-    return countVariants(file, null);
+  public static <T extends Locatable> int countVariants(String vcfPath) throws IOException {
+    return countVariants(vcfPath, null);
   }
 
-  public static <T extends Locatable> int countVariants(File file, T interval) throws IOException {
+  public static <T extends Locatable> int countVariants(String vcfPath, T interval)
+      throws IOException {
+    File vcfFile = new File(URI.create(vcfPath));
     CommandLine commandLine = new CommandLine(getBcftoolsBin());
     commandLine.addArgument("view");
     commandLine.addArgument("-H"); // no header
-    commandLine.addArgument(file.getAbsolutePath());
+    commandLine.addArgument(vcfFile.getAbsolutePath());
     if (interval != null) {
       commandLine.addArgument(
           String.format("%s:%s-%s", interval.getContig(), interval.getStart(), interval.getEnd()));
@@ -52,21 +55,19 @@ public class BcftoolsTestUtil {
     PumpStreamHandler streamHandler = new PumpStreamHandler(outputStream, errorStream);
     exec.setStreamHandler(streamHandler);
     int rc = exec.execute(commandLine);
-    String result =
-        outputStream
-            .toString()
-            .trim(); // the actual variants, one per line (bcftools doesn't have a count option)
+    // the actual variants, one per line (bcftools doesn't have a count option)
+    String result = outputStream.toString().trim();
     String error = errorStream.toString();
 
     if (rc != 0) {
       throw new IllegalStateException(
           String.format(
-              "Bcftools failed processing file %s with code %s. Stderr: %s", file, rc, error));
+              "Bcftools failed processing file %s with code %s. Stderr: %s", vcfFile, rc, error));
     }
     if (error.length() > 0) {
       System.err.println(
           String.format(
-              "Bcftools produced stderr while processing file %s. Stderr: %s", file, error));
+              "Bcftools produced stderr while processing file %s. Stderr: %s", vcfFile, error));
     }
     return result.split("\r\n|\r|\n").length;
   }

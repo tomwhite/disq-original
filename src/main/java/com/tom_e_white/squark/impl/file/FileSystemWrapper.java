@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.List;
+import java.util.Optional;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -26,4 +28,19 @@ public interface FileSystemWrapper extends Serializable {
   List<String> listDirectory(Configuration conf, String path) throws IOException;
 
   void concat(Configuration conf, List<String> parts, String path) throws IOException;
+
+  default String firstFileInDirectory(Configuration conf, String path) throws IOException {
+    Optional<String> firstPath =
+        listDirectory(conf, path)
+            .stream()
+            .filter(
+                f ->
+                    !(FilenameUtils.getBaseName(f).startsWith(".")
+                        || FilenameUtils.getBaseName(f).startsWith("_")))
+            .findFirst();
+    if (!firstPath.isPresent()) {
+      throw new IllegalArgumentException("No files found in " + path);
+    }
+    return firstPath.get();
+  }
 }

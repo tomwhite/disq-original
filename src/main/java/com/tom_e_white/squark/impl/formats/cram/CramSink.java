@@ -5,6 +5,7 @@ import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.Merger;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
+import com.tom_e_white.squark.impl.formats.sam.AbstractSamSink;
 import htsjdk.samtools.CRAMContainerStreamWriter;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
@@ -27,10 +28,11 @@ import scala.Tuple2;
  * @see CramSource
  * @see HtsjdkReadsRdd
  */
-public class CramSink {
+public class CramSink extends AbstractSamSink {
 
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
 
+  @Override
   public void save(
       JavaSparkContext jsc,
       SAMFileHeader header,

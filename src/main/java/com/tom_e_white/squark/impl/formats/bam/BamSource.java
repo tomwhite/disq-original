@@ -12,11 +12,11 @@ import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockGuesser.BgzfBlock;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockSource;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
+import com.tom_e_white.squark.impl.formats.sam.SamFormat;
 import htsjdk.samtools.AbstractBAMFileIndex;
 import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
 import htsjdk.samtools.BAMIndex;
-import htsjdk.samtools.BamFileIoUtils;
 import htsjdk.samtools.Chunk;
 import htsjdk.samtools.ExtSeekableBufferedStream;
 import htsjdk.samtools.QueryInterval;
@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -61,6 +60,11 @@ public class BamSource extends AbstractSamSource implements Serializable {
   public BamSource(boolean useNio) {
     super(useNio ? new NioFileSystemWrapper() : new HadoopFileSystemWrapper());
     this.bgzfBlockSource = new BgzfBlockSource(useNio);
+  }
+
+  @Override
+  public SamFormat getSamFormat() {
+    return SamFormat.BAM;
   }
 
   /**
@@ -227,21 +231,6 @@ public class BamSource extends AbstractSamSource implements Serializable {
       // closed by the close() method
     }
     return bamFileReader;
-  }
-
-  @Override
-  protected SeekableStream findIndex(Configuration conf, String path) throws IOException {
-    String index = path + BAMIndex.BAMIndexSuffix;
-    if (fileSystemWrapper.exists(conf, index)) {
-      return fileSystemWrapper.open(conf, index);
-    }
-    index =
-        path.replaceFirst(
-            Pattern.quote(BamFileIoUtils.BAM_FILE_EXTENSION) + "$", BAMIndex.BAMIndexSuffix);
-    if (fileSystemWrapper.exists(conf, index)) {
-      return fileSystemWrapper.open(conf, index);
-    }
-    return null;
   }
 
   /**

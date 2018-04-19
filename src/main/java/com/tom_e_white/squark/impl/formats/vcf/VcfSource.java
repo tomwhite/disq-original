@@ -26,11 +26,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import java.util.zip.GZIPInputStream;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -52,16 +50,7 @@ public class VcfSource implements Serializable {
     Configuration conf = jsc.hadoopConfiguration();
     String firstVcfPath;
     if (fileSystemWrapper.isDirectory(conf, path)) {
-      Optional<String> firstPath =
-          fileSystemWrapper
-              .listDirectory(conf, path)
-              .stream()
-              .filter(f -> !(FilenameUtils.getBaseName(f).startsWith(".") || FilenameUtils.getBaseName(f).startsWith("_")))
-              .findFirst();
-      if (!firstPath.isPresent()) {
-        throw new IllegalArgumentException("No files found in " + path);
-      }
-      firstVcfPath = firstPath.get();
+      firstVcfPath = fileSystemWrapper.firstFileInDirectory(conf, path);
     } else {
       firstVcfPath = path;
     }

@@ -20,12 +20,17 @@ import org.apache.spark.api.java.JavaSparkContext;
  * @see SamSource
  * @see HtsjdkReadsRdd
  */
-public class SamSink {
+public class SamSink extends AbstractSamSink {
 
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
 
+  @Override
   public void save(
-      JavaSparkContext jsc, SAMFileHeader header, JavaRDD<SAMRecord> reads, String path)
+      JavaSparkContext jsc,
+      SAMFileHeader header,
+      JavaRDD<SAMRecord> reads,
+      String path,
+      String referenceSourcePath)
       throws IOException {
 
     String shardedDir = path + ".sharded";

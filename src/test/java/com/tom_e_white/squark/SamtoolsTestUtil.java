@@ -4,6 +4,7 @@ import htsjdk.samtools.util.Locatable;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.PumpStreamHandler;
@@ -30,25 +31,28 @@ public class SamtoolsTestUtil {
     return System.getProperty(SAMTOOLS_BIN_PROPERTY);
   }
 
-  public static <T extends Locatable> int countReads(File file) throws IOException {
-    return countReads(file, null, null);
+  public static int countReads(final String samPath) throws IOException {
+    return countReads(samPath, null);
   }
 
-  public static <T extends Locatable> int countReads(File file, File reference) throws IOException {
-    return countReads(file, reference, null);
+  public static int countReads(final String samPath, String refPath) throws IOException {
+    return countReads(samPath, refPath, null);
   }
 
   public static <T extends Locatable> int countReads(
-      File file, File reference, HtsjdkReadsTraversalParameters<T> traversalParameters)
+      final String samPath, String refPath, HtsjdkReadsTraversalParameters<T> traversalParameters)
       throws IOException {
+
+    final File samFile = new File(URI.create(samPath));
+    final File refFile = refPath == null ? null : new File(URI.create(refPath));
     CommandLine commandLine = new CommandLine(getSamtoolsBin());
     commandLine.addArgument("view");
     commandLine.addArgument("-c"); // count
-    if (reference != null) {
+    if (refFile != null) {
       commandLine.addArgument("-T");
-      commandLine.addArgument(reference.getAbsolutePath());
+      commandLine.addArgument(refFile.getAbsolutePath());
     }
-    commandLine.addArgument(file.getAbsolutePath());
+    commandLine.addArgument(samFile.getAbsolutePath());
     if (traversalParameters != null) {
       if (traversalParameters.getIntervalsForTraversal() != null) {
         for (T locatable : traversalParameters.getIntervalsForTraversal()) {
@@ -75,12 +79,12 @@ public class SamtoolsTestUtil {
     if (rc != 0) {
       throw new IllegalStateException(
           String.format(
-              "Samtools failed processing file %s with code %s. Stderr: %s", file, rc, error));
+              "Samtools failed processing file %s with code %s. Stderr: %s", samFile, rc, error));
     }
     if (error.length() > 0) {
       System.err.println(
           String.format(
-              "Samtools produced stderr while processing file %s. Stderr: %s", file, error));
+              "Samtools produced stderr while processing file %s. Stderr: %s", samFile, error));
     }
     return Integer.parseInt(result);
   }

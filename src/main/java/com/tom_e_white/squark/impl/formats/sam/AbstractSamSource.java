@@ -15,10 +15,9 @@ import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Iterator;
-import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -31,6 +30,8 @@ public abstract class AbstractSamSource implements Serializable {
     this.fileSystemWrapper = fileSystemWrapper;
   }
 
+  public abstract SamFormat getSamFormat();
+
   public SAMFileHeader getFileHeader(
       JavaSparkContext jsc,
       String path,
@@ -41,16 +42,7 @@ public abstract class AbstractSamSource implements Serializable {
     Configuration conf = jsc.hadoopConfiguration();
     String firstSamPath;
     if (fileSystemWrapper.isDirectory(conf, path)) {
-      Optional<String> firstPath =
-          fileSystemWrapper
-              .listDirectory(conf, path)
-              .stream()
-              .filter(f -> !(FilenameUtils.getBaseName(f).startsWith(".") || FilenameUtils.getBaseName(f).startsWith("_")))
-              .findFirst();
-      if (!firstPath.isPresent()) {
-        throw new IllegalArgumentException("No files found in " + path);
-      }
-      firstSamPath = firstPath.get();
+      firstSamPath = fileSystemWrapper.firstFileInDirectory(conf, path);
     } else {
       firstSamPath = path;
     }
@@ -68,8 +60,6 @@ public abstract class AbstractSamSource implements Serializable {
       ValidationStringency validationStringency,
       String referenceSourcePath)
       throws IOException;
-
-  protected abstract SeekableStream findIndex(Configuration conf, String path) throws IOException;
 
   protected SamReader createSamReader(
       Configuration conf, String path, ValidationStringency stringency, String referenceSourcePath)
@@ -94,6 +84,24 @@ public abstract class AbstractSamSource implements Serializable {
       resource.index(indexStream);
     }
     return readerFactory.open(resource);
+  }
+
+  protected SeekableStream findIndex(Configuration conf, String path) throws IOException {
+    SamFormat samFormat = getSamFormat();
+    if (samFormat.getIndexExtension() == null) {
+      return null; // doesn't support indexes
+    }
+    String index = path + samFormat.getIndexExtension();
+    if (fileSystemWrapper.exists(conf, index)) {
+      return fileSystemWrapper.open(conf, index);
+    }
+    index =
+        path.replaceFirst(
+            Pattern.quote(samFormat.getExtension()) + "$", samFormat.getIndexExtension());
+    if (fileSystemWrapper.exists(conf, index)) {
+      return fileSystemWrapper.open(conf, index);
+    }
+    return null;
   }
 
   protected static <T> Stream<T> stream(final Iterator<T> iterator) {

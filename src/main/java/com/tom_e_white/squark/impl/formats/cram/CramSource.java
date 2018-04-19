@@ -10,6 +10,7 @@ import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
+import com.tom_e_white.squark.impl.formats.sam.SamFormat;
 import htsjdk.samtools.AbstractBAMFileIndex;
 import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
@@ -28,7 +29,6 @@ import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
 import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.cram.CRAIEntry;
 import htsjdk.samtools.cram.CRAIIndex;
-import htsjdk.samtools.cram.build.CramIO;
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.cram.structure.Container;
 import htsjdk.samtools.seekablestream.SeekableStream;
@@ -39,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
@@ -53,6 +52,11 @@ public class CramSource extends AbstractSamSource implements Serializable {
 
   public CramSource() {
     super(new HadoopFileSystemWrapper());
+  }
+
+  @Override
+  public SamFormat getSamFormat() {
+    return SamFormat.CRAM;
   }
 
   @Override
@@ -225,20 +229,5 @@ public class CramSource extends AbstractSamSource implements Serializable {
 
   private CRAMFileReader createCramFileReader(SamReader samReader) throws IOException {
     return (CRAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
-  }
-
-  @Override
-  protected SeekableStream findIndex(Configuration conf, String path) throws IOException {
-    String index = path + CRAIIndex.CRAI_INDEX_SUFFIX;
-    if (fileSystemWrapper.exists(conf, index)) {
-      return fileSystemWrapper.open(conf, index);
-    }
-    index =
-        path.replaceFirst(
-            Pattern.quote(CramIO.CRAM_FILE_EXTENSION) + "$", CRAIIndex.CRAI_INDEX_SUFFIX);
-    if (fileSystemWrapper.exists(conf, index)) {
-      return fileSystemWrapper.open(conf, index);
-    }
-    return null;
   }
 }

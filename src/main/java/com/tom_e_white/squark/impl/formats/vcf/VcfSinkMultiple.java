@@ -9,14 +9,15 @@ import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.broadcast.Broadcast;
 import scala.Tuple2;
 
-public class VcfSinkMultiple implements Serializable {
+public class VcfSinkMultiple extends AbstractVcfSink implements Serializable {
 
   private String extension;
 
-  public VcfSinkMultiple(String extension) {
-    this.extension = extension;
+  public VcfSinkMultiple(VcfFormat vcfFormat) {
+    this.extension = vcfFormat.getExtension();
   }
 
+  @Override
   public void save(
       JavaSparkContext jsc, VCFHeader vcfHeader, JavaRDD<VariantContext> variants, String path) {
     Broadcast<VCFHeader> headerBroadcast = jsc.broadcast(vcfHeader);

@@ -22,7 +22,7 @@ below for details on each feature.
 | Filesystems - Hadoop            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Filesystems - NIO               | :white_check_mark:            | :x:                           | :x:                           | :x:                           |
 | Compression                     | NA                            | NA                            | NA                            | :white_check_mark:            |
-| Multiple input files            | :white_check_mark:            | :x:                           | :x:                           | :x:                           |
+| Multiple input files            | :white_check_mark:            | :x:                           | :white_check_mark:            | :white_check_mark:            |
 | Sharded output                  | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Indexes - read heuristic        | :white_check_mark:            | :white_check_mark:            | NA                            | NA                            |
 | Indexes - read .bai/.crai       | :x:                           | :white_check_mark:            | NA                            | NA                            |
@@ -59,8 +59,8 @@ for cloud stores.
 
 ### Compression
 
-For BAM and CRAM, compression is a part of the file format, so it is necessarily supported. SAM files are not
-compressed.
+For BAM and CRAM, compression is a part of the file format, so it is necessarily supported. Compressed SAM files are not
+supported.
 
 For reading VCF, support includes
 [BGZF](https://samtools.github.io/hts-specs/SAMv1.pdf)-compressed (`.vcf.bgz` or `.vcf.gz`) and
@@ -71,13 +71,15 @@ is not splittable so it is a mistake to write this format).
 
 ### Multiple input files
 
-For reading BAM/CRAM/SAM and VCF, multiple files may be read in one operation. The input paths may be a
-list of individual files, directories, or a mixture of the two. Directories are _not_ processed
+For reading BAM/CRAM/SAM and VCF, multiple files may be read in one operation. A path may either be a
+an individual file, or a directory. Directories are _not_ processed
 recursively, so only the files in the directory are processed, and it is an error for the
 directory to contain subdirectories.
 
-File types may not be mixed: it is an error to process BAM and CRAM files, for example, in one
-operation.
+Directories must contain files with the same header. If files have different headers then the effect of reading the
+files is undefined.
+
+File types may not be mixed: it is an error to process BAM and CRAM files, for example, in one operation.
 
 ### Sharded output
 

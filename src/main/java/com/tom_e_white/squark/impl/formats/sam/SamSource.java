@@ -7,7 +7,6 @@ import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMLineParser;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.ValidationStringency;
-import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.io.Serializable;
@@ -26,6 +25,11 @@ public class SamSource extends AbstractSamSource implements Serializable {
 
   public SamSource() {
     super(new HadoopFileSystemWrapper());
+  }
+
+  @Override
+  public SamFormat getSamFormat() {
+    return SamFormat.SAM;
   }
 
   @Override
@@ -80,10 +84,5 @@ public class SamSource extends AbstractSamSource implements Serializable {
             path, TextInputFormat.class, LongWritable.class, Text.class, jsc.hadoopConfiguration())
         .map(pair -> pair._2.toString())
         .setName(path);
-  }
-
-  @Override
-  protected SeekableStream findIndex(Configuration conf, String path) throws IOException {
-    return null; // SAM files don't have indexes
   }
 }

@@ -20,10 +20,11 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.broadcast.Broadcast;
 
-public class VcfSink {
+public class VcfSink extends AbstractVcfSink {
 
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
 
+  @Override
   public void save(
       JavaSparkContext jsc, VCFHeader vcfHeader, JavaRDD<VariantContext> variants, String path)
       throws IOException {

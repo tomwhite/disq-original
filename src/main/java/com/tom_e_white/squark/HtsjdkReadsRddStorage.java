@@ -1,19 +1,21 @@
 package com.tom_e_white.squark;
 
+import com.tom_e_white.squark.impl.file.FileSystemWrapper;
+import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
+import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import com.tom_e_white.squark.impl.formats.bam.BamSink;
 import com.tom_e_white.squark.impl.formats.bam.BamSource;
 import com.tom_e_white.squark.impl.formats.cram.CramSink;
 import com.tom_e_white.squark.impl.formats.cram.CramSource;
+import com.tom_e_white.squark.impl.formats.sam.AbstractSamSink;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import com.tom_e_white.squark.impl.formats.sam.AnySamSinkMultiple;
+import com.tom_e_white.squark.impl.formats.sam.SamFormat;
 import com.tom_e_white.squark.impl.formats.sam.SamSink;
 import com.tom_e_white.squark.impl.formats.sam.SamSource;
-import htsjdk.samtools.BamFileIoUtils;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.ValidationStringency;
-import htsjdk.samtools.cram.build.CramIO;
-import htsjdk.samtools.util.IOUtil;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import org.apache.spark.api.java.JavaRDD;
@@ -21,6 +23,26 @@ import org.apache.spark.api.java.JavaSparkContext;
 
 /** The entry point for reading or writing a {@link HtsjdkReadsRdd}. */
 public class HtsjdkReadsRddStorage {
+
+  /** An option for configuring how to write a {@link HtsjdkReadsRdd}. */
+  public interface WriteOption {}
+
+  /** An option for configuring which format to write a {@link HtsjdkReadsRdd} as. */
+  public enum FormatWriteOption implements WriteOption {
+    /** BAM format */
+    BAM,
+    /** CRAM format */
+    CRAM,
+    /** SAM format */
+    SAM;
+  }
+
+  public enum FileCardinalityWriteOption implements WriteOption {
+    /** Write a single file specified by the path. */
+    SINGLE,
+    /** Write multiple files in a directory specified by the path. */
+    MULTIPLE
+  }
 
   private JavaSparkContext sparkContext;
   private int splitSize;
@@ -62,15 +84,38 @@ public class HtsjdkReadsRddStorage {
 
   public <T extends Locatable> HtsjdkReadsRdd read(
       String path, HtsjdkReadsTraversalParameters<T> traversalParameters) throws IOException {
-    AbstractSamSource abstractSamSource;
 
-    if (path.endsWith(CramIO.CRAM_FILE_EXTENSION) || path.endsWith(".crams") || path.endsWith(".crams/")) {
-      abstractSamSource = new CramSource();
-    } else if (path.endsWith(IOUtil.SAM_FILE_EXTENSION) || path.endsWith(".sams") || path.endsWith(".sams/")) {
-      abstractSamSource = new SamSource();
+    FileSystemWrapper fileSystemWrapper =
+        useNio ? new NioFileSystemWrapper() : new HadoopFileSystemWrapper();
+
+    String firstSamPath;
+    if (fileSystemWrapper.isDirectory(sparkContext.hadoopConfiguration(), path)) {
+      firstSamPath =
+          fileSystemWrapper.firstFileInDirectory(sparkContext.hadoopConfiguration(), path);
     } else {
-      abstractSamSource = new BamSource(useNio);
+      firstSamPath = path;
     }
+    SamFormat samFormat = SamFormat.fromPath(firstSamPath);
+
+    if (samFormat == null) {
+      throw new IllegalArgumentException("Cannot find format extension for " + path);
+    }
+
+    AbstractSamSource abstractSamSource;
+    switch (samFormat) {
+      case BAM:
+        abstractSamSource = new BamSource(useNio);
+        break;
+      case CRAM:
+        abstractSamSource = new CramSource();
+        break;
+      case SAM:
+        abstractSamSource = new SamSource();
+        break;
+      default:
+        throw new IllegalArgumentException("File does not end in BAM, CRAM, or SAM extension.");
+    }
+
     SAMFileHeader header =
         abstractSamSource.getFileHeader(
             sparkContext, path, validationStringency, referenceSourcePath);
@@ -85,28 +130,71 @@ public class HtsjdkReadsRddStorage {
     return new HtsjdkReadsRdd(header, reads);
   }
 
-  public void write(HtsjdkReadsRdd htsjdkReadsRdd, String path) throws IOException {
-    if (path.endsWith(CramIO.CRAM_FILE_EXTENSION)) {
-      new CramSink()
-          .save(
-              sparkContext,
-              htsjdkReadsRdd.getHeader(),
-              htsjdkReadsRdd.getReads(),
-              path,
-              referenceSourcePath);
-    } else if (path.endsWith(IOUtil.SAM_FILE_EXTENSION)) {
-      new SamSink().save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
-    } else if (path.endsWith(".bams") || path.endsWith(".bams/")) {
-      new AnySamSinkMultiple(BamFileIoUtils.BAM_FILE_EXTENSION)
-          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path, referenceSourcePath);
-    } else if (path.endsWith(".crams") || path.endsWith(".crams/")) {
-      new AnySamSinkMultiple(CramIO.CRAM_FILE_EXTENSION)
-          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path, referenceSourcePath);
-    } else if (path.endsWith(".sams") || path.endsWith(".sams/")) {
-      new AnySamSinkMultiple(IOUtil.SAM_FILE_EXTENSION)
-          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path, referenceSourcePath);
-    } else {
-      new BamSink().save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
+  public void write(HtsjdkReadsRdd htsjdkReadsRdd, String path, WriteOption... writeOptions)
+      throws IOException {
+    FormatWriteOption formatWriteOption = null;
+    FileCardinalityWriteOption fileCardinalityWriteOption = null;
+    for (WriteOption writeOption : writeOptions) {
+      if (writeOption instanceof FormatWriteOption) {
+        formatWriteOption = (FormatWriteOption) writeOption;
+      } else if (writeOption instanceof FileCardinalityWriteOption) {
+        fileCardinalityWriteOption = (FileCardinalityWriteOption) writeOption;
+      }
+    }
+
+    if (formatWriteOption == null) {
+      formatWriteOption = inferFormatFromPath(path);
+    }
+
+    if (formatWriteOption == null) {
+      throw new IllegalArgumentException(
+          "Path does not end in BAM, CRAM, or SAM extension, and format not specified.");
+    }
+
+    if (fileCardinalityWriteOption == null) {
+      fileCardinalityWriteOption = inferCardinalityFromPath(path);
+    }
+
+    getSink(formatWriteOption, fileCardinalityWriteOption)
+        .save(
+            sparkContext,
+            htsjdkReadsRdd.getHeader(),
+            htsjdkReadsRdd.getReads(),
+            path,
+            referenceSourcePath);
+  }
+
+  private FormatWriteOption inferFormatFromPath(String path) {
+    SamFormat samFormat = SamFormat.fromPath(path);
+    return samFormat == null ? null : samFormat.toFormatWriteOption();
+  }
+
+  private FileCardinalityWriteOption inferCardinalityFromPath(String path) {
+    SamFormat samFormat = SamFormat.fromPath(path);
+    return samFormat == null
+        ? FileCardinalityWriteOption.MULTIPLE
+        : FileCardinalityWriteOption.SINGLE;
+  }
+
+  private AbstractSamSink getSink(
+      FormatWriteOption formatWriteOption, FileCardinalityWriteOption fileCardinalityWriteOption) {
+    switch (fileCardinalityWriteOption) {
+      case SINGLE:
+        switch (formatWriteOption) {
+          case BAM:
+            return new BamSink();
+          case CRAM:
+            return new CramSink();
+          case SAM:
+            return new SamSink();
+          default:
+            throw new IllegalArgumentException("Unrecognized format: " + formatWriteOption);
+        }
+      case MULTIPLE:
+        return new AnySamSinkMultiple(SamFormat.fromFormatWriteOption(formatWriteOption));
+      default:
+        throw new IllegalArgumentException(
+            "Unrecognized cardinality: " + fileCardinalityWriteOption);
     }
   }
 }

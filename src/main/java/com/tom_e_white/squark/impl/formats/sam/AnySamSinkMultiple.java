@@ -25,27 +25,33 @@ import scala.Tuple2;
  * @see SamSink
  * @see HtsjdkReadsRdd
  */
-public class AnySamSinkMultiple implements Serializable {
+public class AnySamSinkMultiple extends AbstractSamSink implements Serializable {
 
-  private String extension;
+  private SamFormat samFormat;
 
-  public AnySamSinkMultiple(String extension) {
-    this.extension = extension;
+  public AnySamSinkMultiple(SamFormat samFormat) {
+    this.samFormat = samFormat;
   }
 
+  @Override
   public void save(
-      JavaSparkContext jsc, SAMFileHeader header, JavaRDD<SAMRecord> reads, String path,
+      JavaSparkContext jsc,
+      SAMFileHeader header,
+      JavaRDD<SAMRecord> reads,
+      String path,
       String referenceSourcePath) {
 
-      ReferenceSource referenceSource = referenceSourcePath == null ? null :
-          new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath));
-      Broadcast<SAMFileHeader> headerBroadcast = jsc.broadcast(header);
-      Broadcast<CRAMReferenceSource> referenceSourceBroadCast = jsc.broadcast(referenceSource);
+    ReferenceSource referenceSource =
+        referenceSourcePath == null
+            ? null
+            : new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath));
+    Broadcast<SAMFileHeader> headerBroadcast = jsc.broadcast(header);
+    Broadcast<CRAMReferenceSource> referenceSourceBroadCast = jsc.broadcast(referenceSource);
     reads
         .mapPartitions(
             readIterator -> {
               AnySamOutputFormat.setHeader(headerBroadcast.getValue());
-              AnySamOutputFormat.setExtension(extension);
+              AnySamOutputFormat.setSamFormat(samFormat);
               AnySamOutputFormat.setReferenceSource(referenceSourceBroadCast.getValue());
               return readIterator;
             })

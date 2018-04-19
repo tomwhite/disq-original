@@ -1,5 +1,12 @@
 package com.tom_e_white.squark;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.AfterClass;
@@ -18,5 +25,30 @@ public abstract class BaseTest {
   @AfterClass
   public static void teardown() {
     jsc.stop();
+  }
+
+  protected String getPath(String localResource) throws URISyntaxException {
+    if (localResource == null) {
+      return null;
+    }
+    return ClassLoader.getSystemClassLoader().getResource(localResource).toURI().toString();
+  }
+
+  protected File createTempFile(String extension) throws IOException {
+    File file = File.createTempFile("test", extension);
+    file.delete();
+    file.deleteOnExit();
+    return file;
+  }
+
+  protected String createTempPath(String extension) throws IOException {
+    return createTempFile(extension).toURI().toString();
+  }
+
+  protected List<String> listPartFiles(String dir) {
+    return Arrays.stream(
+            new File(URI.create(dir)).listFiles(file -> file.getName().startsWith("part-")))
+        .map(f -> f.toURI().toString())
+        .collect(Collectors.toList());
   }
 }

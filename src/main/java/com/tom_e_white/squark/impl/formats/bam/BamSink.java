@@ -4,6 +4,7 @@ import com.tom_e_white.squark.HtsjdkReadsRdd;
 import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.Merger;
+import com.tom_e_white.squark.impl.formats.sam.AbstractSamSink;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMSequenceRecord;
@@ -27,12 +28,17 @@ import scala.Tuple2;
  * @see BamSource
  * @see HtsjdkReadsRdd
  */
-public class BamSink {
+public class BamSink extends AbstractSamSink {
 
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
 
+  @Override
   public void save(
-      JavaSparkContext jsc, SAMFileHeader header, JavaRDD<SAMRecord> reads, String path)
+      JavaSparkContext jsc,
+      SAMFileHeader header,
+      JavaRDD<SAMRecord> reads,
+      String path,
+      String referenceSourcePath)
       throws IOException {
 
     String shardedDir = path + ".sharded";
