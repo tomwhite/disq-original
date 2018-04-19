@@ -1,6 +1,7 @@
 package com.tom_e_white.squark;
 
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
+import htsjdk.samtools.BamFileIoUtils;
 import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
@@ -8,12 +9,17 @@ import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.SamStreams;
+import htsjdk.samtools.cram.build.CramIO;
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.util.IOUtil;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -72,30 +78,43 @@ public class HtsjdkReadsRddTest extends BaseTest {
     if (SamtoolsTestUtil.isSamtoolsAvailable()) {
       Assert.assertEquals(expectedCount, SamtoolsTestUtil.countReads(outputFile, refFile));
     }
+
+    // check we can read what we've just written back
+    Assert.assertEquals(expectedCount, htsjdkReadsRddStorage.read(outputPath).getReads().count());
   }
 
   private Object[] parametersForTestReadAndWriteMultiple() {
     return new Object[][] {
-      {".bams", false},
-      {".crams", false},
-      {".sams", false},
+      {null, ".bams", false, ".bam", ".bai"},
+      //{"test.fa", ".crams", false, ".cram", ".crai"}, // TODO: reinstate when we can read multiple CRAM files
+      {null, ".sams", false, ".sam", null},
     };
   }
 
   @Test
   @Parameters
-  public void testReadAndWriteMultiple(String outputExtension, boolean useNio) throws Exception {
+  public void testReadAndWriteMultiple(String cramReferenceFile, String outputExtension, boolean useNio, String extension, String indexExtension) throws Exception {
 
-    String inputPath =
-        BAMTestUtil.writeBamFile(1000, SAMFileHeader.SortOrder.coordinate).toURI().toString();
     HtsjdkReadsRddStorage htsjdkReadsRddStorage =
         HtsjdkReadsRddStorage.makeDefault(jsc).splitSize(40000).useNio(false);
+    File refFile = null;
+    if (cramReferenceFile != null) {
+      refFile = new File(ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI());
+      String cramReferencePath = refFile.toString();
+      htsjdkReadsRddStorage.referenceSourcePath(cramReferencePath);
+    }
+
+    String inputPath =
+        AnySamTestUtil.writeAnySamFile(
+            1000, SAMFileHeader.SortOrder.coordinate, extension, indexExtension, refFile)
+            .toURI()
+            .toString();
 
     HtsjdkReadsRdd htsjdkReadsRdd = htsjdkReadsRddStorage.read(inputPath);
 
     Assert.assertTrue(htsjdkReadsRdd.getReads().getNumPartitions() > 1);
 
-    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")), null);
+    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")), refFile);
     Assert.assertEquals(expectedCount, htsjdkReadsRdd.getReads().count());
 
     File outputFile = File.createTempFile("test", outputExtension);
@@ -108,17 +127,20 @@ public class HtsjdkReadsRddTest extends BaseTest {
 
     int totalCount = 0;
     for (File part : outputFile.listFiles(file -> file.getName().startsWith("part-"))) {
-      totalCount += getBAMRecordCount(part, null);
+      totalCount += getBAMRecordCount(part, refFile);
     }
     Assert.assertEquals(expectedCount, totalCount);
 
     if (SamtoolsTestUtil.isSamtoolsAvailable()) {
       int totalCountSamtools = 0;
       for (File part : outputFile.listFiles(file -> file.getName().startsWith("part-"))) {
-        totalCountSamtools += SamtoolsTestUtil.countReads(part, null);
+        totalCountSamtools += SamtoolsTestUtil.countReads(part, refFile);
       }
       Assert.assertEquals(expectedCount, totalCountSamtools);
     }
+
+    // check we can read what we've just written back
+    Assert.assertEquals(expectedCount, htsjdkReadsRddStorage.read(outputPath).getReads().count());
   }
 
   @Test
@@ -142,7 +164,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
     Assert.assertEquals(expectedCount, htsjdkReadsRdd.getReads().count());
   }
 
-  private Object[] parametersForTestIntervals() {
+  private Object[] parametersForTestReadIntervals() {
     return new Object[][] {
       {
         null,
@@ -243,7 +265,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
 
   @Test
   @Parameters
-  public <T extends Locatable> void testIntervals(
+  public <T extends Locatable> void testReadIntervals(
       String cramReferenceFile,
       HtsjdkReadsTraversalParameters<T> traversalParameters,
       String extension,
@@ -260,7 +282,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
     }
 
     String inputPath =
-        BAMTestUtil.writeBamFile(
+        AnySamTestUtil.writeAnySamFile(
                 1000, SAMFileHeader.SortOrder.coordinate, extension, indexExtension, refFile)
             .toURI()
             .toString();
@@ -284,7 +306,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
   @Test(expected = IllegalArgumentException.class)
   public void testMappedOnlyFails() throws Exception {
     String inputPath =
-        BAMTestUtil.writeBamFile(1000, SAMFileHeader.SortOrder.coordinate).toURI().toString();
+        AnySamTestUtil.writeAnySamFile(1000, SAMFileHeader.SortOrder.coordinate).toURI().toString();
 
     HtsjdkReadsRddStorage htsjdkReadsRddStorage =
         HtsjdkReadsRddStorage.makeDefault(jsc).splitSize(40000).useNio(false);
@@ -303,6 +325,19 @@ public class HtsjdkReadsRddTest extends BaseTest {
   private static <T extends Locatable> int getBAMRecordCount(
       final File bamFile, File refFile, HtsjdkReadsTraversalParameters<T> traversalParameters)
       throws IOException {
+
+    // test file contents is consistent with extension
+    try (InputStream in = new BufferedInputStream(new FileInputStream(bamFile))) {
+      if (bamFile.getName().endsWith(BamFileIoUtils.BAM_FILE_EXTENSION)) {
+          Assert.assertTrue("Not a BAM file", SamStreams.isBAMFile(in));
+      } else if (bamFile.getName().endsWith(CramIO.CRAM_FILE_EXTENSION)) {
+        Assert.assertTrue("Not a CRAM file", SamStreams.isCRAMFile(in));
+      } else if (bamFile.getName().endsWith(IOUtil.SAM_FILE_EXTENSION)) {
+        Assert.assertTrue("Not a SAM file", in.read() == '@');
+      } else {
+        Assert.fail("File is not BAM, CRAM or SAM.");
+    }
+  }
 
     ReferenceSource referenceSource = refFile == null ? null : new ReferenceSource(refFile);
     int recCount = 0;

@@ -64,9 +64,9 @@ public class HtsjdkReadsRddStorage {
       String path, HtsjdkReadsTraversalParameters<T> traversalParameters) throws IOException {
     AbstractSamSource abstractSamSource;
 
-    if (path.endsWith(CramIO.CRAM_FILE_EXTENSION)) {
+    if (path.endsWith(CramIO.CRAM_FILE_EXTENSION) || path.endsWith(".crams") || path.endsWith(".crams/")) {
       abstractSamSource = new CramSource();
-    } else if (path.endsWith(IOUtil.SAM_FILE_EXTENSION)) {
+    } else if (path.endsWith(IOUtil.SAM_FILE_EXTENSION) || path.endsWith(".sams") || path.endsWith(".sams/")) {
       abstractSamSource = new SamSource();
     } else {
       abstractSamSource = new BamSource(useNio);
@@ -98,13 +98,13 @@ public class HtsjdkReadsRddStorage {
       new SamSink().save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
     } else if (path.endsWith(".bams") || path.endsWith(".bams/")) {
       new AnySamSinkMultiple(BamFileIoUtils.BAM_FILE_EXTENSION)
-          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
+          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path, referenceSourcePath);
     } else if (path.endsWith(".crams") || path.endsWith(".crams/")) {
       new AnySamSinkMultiple(CramIO.CRAM_FILE_EXTENSION)
-          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
+          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path, referenceSourcePath);
     } else if (path.endsWith(".sams") || path.endsWith(".sams/")) {
       new AnySamSinkMultiple(IOUtil.SAM_FILE_EXTENSION)
-          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
+          .save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path, referenceSourcePath);
     } else {
       new BamSink().save(sparkContext, htsjdkReadsRdd.getHeader(), htsjdkReadsRdd.getReads(), path);
     }

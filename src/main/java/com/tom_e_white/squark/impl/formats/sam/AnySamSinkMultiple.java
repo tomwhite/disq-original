@@ -1,8 +1,11 @@
 package com.tom_e_white.squark.impl.formats.sam;
 
 import com.tom_e_white.squark.HtsjdkReadsRdd;
+import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.cram.ref.CRAMReferenceSource;
+import htsjdk.samtools.cram.ref.ReferenceSource;
 import java.io.Serializable;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -31,14 +34,19 @@ public class AnySamSinkMultiple implements Serializable {
   }
 
   public void save(
-      JavaSparkContext jsc, SAMFileHeader header, JavaRDD<SAMRecord> reads, String path) {
+      JavaSparkContext jsc, SAMFileHeader header, JavaRDD<SAMRecord> reads, String path,
+      String referenceSourcePath) {
 
-    Broadcast<SAMFileHeader> headerBroadcast = jsc.broadcast(header);
+      ReferenceSource referenceSource = referenceSourcePath == null ? null :
+          new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath));
+      Broadcast<SAMFileHeader> headerBroadcast = jsc.broadcast(header);
+      Broadcast<CRAMReferenceSource> referenceSourceBroadCast = jsc.broadcast(referenceSource);
     reads
         .mapPartitions(
             readIterator -> {
               AnySamOutputFormat.setHeader(headerBroadcast.getValue());
               AnySamOutputFormat.setExtension(extension);
+              AnySamOutputFormat.setReferenceSource(referenceSourceBroadCast.getValue());
               return readIterator;
             })
         .mapToPair(

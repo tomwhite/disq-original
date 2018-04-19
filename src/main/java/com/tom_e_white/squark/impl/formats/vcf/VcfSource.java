@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import java.util.zip.GZIPInputStream;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -55,7 +56,7 @@ public class VcfSource implements Serializable {
           fileSystemWrapper
               .listDirectory(conf, path)
               .stream()
-              .filter(f -> !(f.startsWith(".") || f.startsWith("_")))
+              .filter(f -> !(FilenameUtils.getBaseName(f).startsWith(".") || FilenameUtils.getBaseName(f).startsWith("_")))
               .findFirst();
       if (!firstPath.isPresent()) {
         throw new IllegalArgumentException("No files found in " + path);

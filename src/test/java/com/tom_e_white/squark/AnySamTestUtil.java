@@ -18,13 +18,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public class BAMTestUtil {
-  public static File writeBamFile(int numPairs, SAMFileHeader.SortOrder sortOrder)
+public class AnySamTestUtil {
+  public static File writeAnySamFile(int numPairs, SAMFileHeader.SortOrder sortOrder)
       throws IOException {
-    return writeBamFile(numPairs, sortOrder, ".bam", BAMIndex.BAMIndexSuffix, null);
+    return writeAnySamFile(numPairs, sortOrder, BamFileIoUtils.BAM_FILE_EXTENSION, BAMIndex.BAMIndexSuffix, null);
   }
 
-  public static File writeBamFile(
+  public static File writeAnySamFile(
       int numPairs,
       SAMFileHeader.SortOrder sortOrder,
       String extension,

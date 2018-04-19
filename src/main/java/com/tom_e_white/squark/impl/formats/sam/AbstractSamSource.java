@@ -18,6 +18,7 @@ import java.util.Iterator;
 import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -44,7 +45,7 @@ public abstract class AbstractSamSource implements Serializable {
           fileSystemWrapper
               .listDirectory(conf, path)
               .stream()
-              .filter(f -> !(f.startsWith(".") || f.startsWith("_")))
+              .filter(f -> !(FilenameUtils.getBaseName(f).startsWith(".") || FilenameUtils.getBaseName(f).startsWith("_")))
               .findFirst();
       if (!firstPath.isPresent()) {
         throw new IllegalArgumentException("No files found in " + path);
