@@ -19,6 +19,8 @@ public interface FileSystemWrapper extends Serializable {
 
   OutputStream create(Configuration conf, String path) throws IOException;
 
+  boolean delete(Configuration conf, String path) throws IOException;
+
   boolean exists(Configuration conf, String path) throws IOException;
 
   long getFileLength(Configuration conf, String path) throws IOException;

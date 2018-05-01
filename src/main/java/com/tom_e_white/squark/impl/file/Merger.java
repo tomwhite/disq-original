@@ -1,6 +1,9 @@
 package com.tom_e_white.squark.impl.file;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configuration;
 
 public class Merger {
@@ -13,7 +16,15 @@ public class Merger {
 
   public void mergeParts(Configuration conf, String partDirectory, String outputFile)
       throws IOException {
-    fileSystemWrapper.concat(
-        conf, fileSystemWrapper.listDirectory(conf, partDirectory), outputFile);
+    List<String> parts = fileSystemWrapper.listDirectory(conf, partDirectory);
+    List<String> filteredParts =
+        parts
+            .stream()
+            .filter(
+                f ->
+                    !(FilenameUtils.getBaseName(f).startsWith(".")
+                        || FilenameUtils.getBaseName(f).startsWith("_")))
+            .collect(Collectors.toList());
+    fileSystemWrapper.concat(conf, filteredParts, outputFile);
   }
 }

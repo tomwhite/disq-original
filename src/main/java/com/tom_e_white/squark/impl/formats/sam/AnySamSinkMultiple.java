@@ -1,11 +1,14 @@
 package com.tom_e_white.squark.impl.formats.sam;
 
 import com.tom_e_white.squark.HtsjdkReadsRdd;
+import com.tom_e_white.squark.impl.file.FileSystemWrapper;
+import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.cram.ref.CRAMReferenceSource;
 import htsjdk.samtools.cram.ref.ReferenceSource;
+import java.io.IOException;
 import java.io.Serializable;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -39,7 +42,14 @@ public class AnySamSinkMultiple extends AbstractSamSink implements Serializable 
       SAMFileHeader header,
       JavaRDD<SAMRecord> reads,
       String path,
-      String referenceSourcePath) {
+      String referenceSourcePath)
+      throws IOException {
+
+    FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
+    if (fileSystemWrapper.exists(
+        jsc.hadoopConfiguration(), path)) { // delete output path if it exists
+      fileSystemWrapper.delete(jsc.hadoopConfiguration(), path);
+    }
 
     ReferenceSource referenceSource =
         referenceSourcePath == null

@@ -33,6 +33,13 @@ public class HadoopFileSystemWrapper implements FileSystemWrapper {
   }
 
   @Override
+  public boolean delete(Configuration conf, String path) throws IOException {
+    Path p = new Path(path);
+    FileSystem fileSystem = p.getFileSystem(conf);
+    return fileSystem.delete(p, true);
+  }
+
+  @Override
   public boolean exists(Configuration conf, String path) throws IOException {
     Path p = new Path(path);
     FileSystem fileSystem = p.getFileSystem(conf);
@@ -65,11 +72,17 @@ public class HadoopFileSystemWrapper implements FileSystemWrapper {
 
   @Override
   public void concat(Configuration conf, List<String> parts, String path) throws IOException {
-    Path p = new Path(path); // TODO: check same fs as parts
-    FileSystem fileSystem = p.getFileSystem(conf);
-    fileSystem.create(p).close(); // target must already exist for concat
+    // target must be in same directory as parts being concat'ed
+    Path tmp = new Path(new Path(parts.get(0)).getParent(), "output");
+    FileSystem fileSystem = tmp.getFileSystem(conf);
+    fileSystem.create(tmp).close(); // target must already exist for concat
     try {
-      concat(parts, p, fileSystem);
+      concat(parts, tmp, fileSystem);
+      Path target = new Path(path);
+      if (fileSystem.exists(target)) { // delete target if it exists
+        fileSystem.delete(target, true);
+      }
+      fileSystem.rename(tmp, target);
     } catch (UnsupportedOperationException e) {
       System.out.println("Concat not supported, merging serially");
       try (OutputStream out = create(conf, path)) {
@@ -80,6 +93,7 @@ public class HadoopFileSystemWrapper implements FileSystemWrapper {
           fileSystem.delete(new Path(part), false);
         }
       }
+      fileSystem.delete(tmp, false);
     }
   }
 

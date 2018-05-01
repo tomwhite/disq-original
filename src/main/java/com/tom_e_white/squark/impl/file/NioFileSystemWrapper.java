@@ -28,6 +28,11 @@ public class NioFileSystemWrapper implements FileSystemWrapper {
   }
 
   @Override
+  public boolean delete(Configuration conf, String path) throws IOException {
+    return Files.deleteIfExists(asPath(path));
+  }
+
+  @Override
   public boolean exists(Configuration conf, String path) {
     return Files.isRegularFile(asPath(path));
   }
