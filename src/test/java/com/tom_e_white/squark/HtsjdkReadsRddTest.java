@@ -70,8 +70,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
   private Object[] parametersForTestReadAndWriteMultiple() {
     return new Object[][] {
       {null, false, FormatWriteOption.BAM},
-      // {"test.fa", false, FormatWriteOption.CRAM}, // TODO: reinstate when we can read multiple
-      // CRAM files
+      {"test.fa", false, FormatWriteOption.CRAM},
       {null, false, FormatWriteOption.SAM},
     };
   }

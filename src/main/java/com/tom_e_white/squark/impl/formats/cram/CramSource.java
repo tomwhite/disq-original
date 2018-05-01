@@ -35,10 +35,9 @@ import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+import java.net.URI;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
@@ -81,9 +80,27 @@ public class CramSource extends AbstractSamSource implements Serializable {
       conf.setInt(FileInputFormat.SPLIT_MAXSIZE, splitSize);
     }
 
-    long cramFileLength = fileSystemWrapper.getFileLength(conf, path);
-    List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, path, cramFileLength);
-    Broadcast<List<Long>> containerOffsetsBroadcast = jsc.broadcast(containerOffsets);
+    // store paths (not full URIs) to avoid differences in scheme - this could be improved
+    Map<String, List<Long>> pathToContainerOffsets = new LinkedHashMap<>();
+    if (fileSystemWrapper.isDirectory(conf, path)) {
+      List<String> paths =
+          fileSystemWrapper
+              .listDirectory(conf, path)
+              .stream()
+              .filter(SamFormat.CRAM::fileMatches)
+              .collect(Collectors.toList());
+      for (String p : paths) {
+        long cramFileLength = fileSystemWrapper.getFileLength(conf, p);
+        List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, p, cramFileLength);
+        pathToContainerOffsets.put(URI.create(p).getPath(), containerOffsets);
+      }
+    } else {
+      long cramFileLength = fileSystemWrapper.getFileLength(conf, path);
+      List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, path, cramFileLength);
+      pathToContainerOffsets.put(URI.create(path).getPath(), containerOffsets);
+    }
+    Broadcast<Map<String, List<Long>>> containerOffsetsBroadcast =
+        jsc.broadcast(pathToContainerOffsets);
 
     SerializableHadoopConfiguration confSer = new SerializableHadoopConfiguration(conf);
     Broadcast<HtsjdkReadsTraversalParameters<T>> traversalParametersBroadcast =
@@ -93,7 +110,9 @@ public class CramSource extends AbstractSamSource implements Serializable {
             (FlatMapFunction<Tuple2<Void, FileSplit>, SAMRecord>)
                 t2 -> {
                   FileSplit fileSplit = t2._2();
-                  List<Long> offsets = containerOffsetsBroadcast.getValue();
+                  String p = fileSplit.getPath().toUri().toString();
+                  Map<String, List<Long>> pathToOffsets = containerOffsetsBroadcast.getValue();
+                  List<Long> offsets = pathToOffsets.get(fileSplit.getPath().toUri().getPath());
                   long newStart = nextContainerOffset(offsets, fileSplit.getStart());
                   long newEnd =
                       nextContainerOffset(offsets, fileSplit.getStart() + fileSplit.getLength());
@@ -101,7 +120,6 @@ public class CramSource extends AbstractSamSource implements Serializable {
                     return Collections.emptyIterator();
                   }
                   Configuration c = confSer.getConf();
-                  String p = fileSplit.getPath().toString();
                   SamReader samReader =
                       createSamReader(c, p, validationStringency, referenceSourcePath);
                   CRAMFileReader cramFileReader = createCramFileReader(samReader);

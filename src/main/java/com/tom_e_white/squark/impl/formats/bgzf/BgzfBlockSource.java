@@ -5,6 +5,7 @@ import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
+import com.tom_e_white.squark.impl.formats.bam.BamSource;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockGuesser.BgzfBlock;
 import htsjdk.samtools.util.AbstractIterator;
 import java.io.IOException;

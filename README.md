@@ -22,7 +22,7 @@ below for details on each feature.
 | Filesystems - Hadoop            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Filesystems - NIO               | :white_check_mark:            | :x:                           | :x:                           | :x:                           |
 | Compression                     | NA                            | NA                            | NA                            | :white_check_mark:            |
-| Multiple input files            | :white_check_mark:            | :x:                           | :white_check_mark:            | :white_check_mark:            |
+| Multiple input files            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Sharded output                  | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Indexes - read heuristic        | :white_check_mark:            | :white_check_mark:            | NA                            | NA                            |
 | Indexes - read .bai/.crai       | :x:                           | :white_check_mark:            | NA                            | NA                            |
