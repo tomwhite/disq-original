@@ -163,3 +163,17 @@ All read and write paths are tested on real files from the field (multi-GB in si
 read successfully. (Version 1.4 of samtools, and 1.3 of bcftools were used. The latter was needed to avoid
 [this bug](https://github.com/samtools/bcftools/issues/420).)
 
+## Implementation notes for developers
+
+The library requires Java 8 or later. The surface area of the API has deliberately been kept small by exposing only a
+few public classes in the top-level `squark` package, and putting all the private implementation classes in `impl`
+packages. Users should not access anything in `impl`. While it is not possible to enforce this, anything in `impl`
+is not subject to version control rules (i.e. it could be removed in any release).
+
+The naming of classes in the public API reflects the fact that they work with htsjdk and Spark RDDs:
+e.g. `HtsjdkReadsRddStorage`. In the future it will be possible to have alternative models that are not htsjdk
+(or are a different version), or that use Spark datasets.
+
+As a general rule, any code that does not have a Spark or Hadoop dependency, or does not have a "distributed" flavor
+belongs in htsjdk. This rule may be broken during a transition period while the code is being moved to htsjdk.
+
