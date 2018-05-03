@@ -37,6 +37,7 @@ public class HtsjdkReadsRddStorage {
     SAM;
   }
 
+  /** An option for configuring the number of files to write a {@link HtsjdkReadsRdd} as. */
   public enum FileCardinalityWriteOption implements WriteOption {
     /** Write a single file specified by the path. */
     SINGLE,
@@ -50,6 +51,11 @@ public class HtsjdkReadsRddStorage {
   private boolean useNio;
   private String referenceSourcePath;
 
+  /**
+   * Create a {@link HtsjdkReadsRddStorage} from a Spark context object.
+   * @param sparkContext the Spark context to use
+   * @return a {@link HtsjdkReadsRddStorage}
+   */
   public static HtsjdkReadsRddStorage makeDefault(JavaSparkContext sparkContext) {
     return new HtsjdkReadsRddStorage(sparkContext);
   }
@@ -58,30 +64,60 @@ public class HtsjdkReadsRddStorage {
     this.sparkContext = sparkContext;
   }
 
+  /**
+   * @param splitSize the requested size of file splits when reading
+   * @return the current {@link HtsjdkReadsRddStorage}
+   */
   public HtsjdkReadsRddStorage splitSize(int splitSize) {
     this.splitSize = splitSize;
     return this;
   }
 
+  /**
+   * @param validationStringency the validation stringency for reading
+   * @return the current {@link HtsjdkReadsRddStorage}
+   */
   public HtsjdkReadsRddStorage validationStringency(ValidationStringency validationStringency) {
     this.validationStringency = validationStringency;
     return this;
   }
 
+  /**
+   * @param useNio whether to use NIO or the Hadoop filesystem (default) for file operations
+   * @return the current {@link HtsjdkReadsRddStorage}
+   */
   public HtsjdkReadsRddStorage useNio(boolean useNio) {
     this.useNio = useNio;
     return this;
   }
 
+  /**
+   * @param referenceSourcePath path to the reference; only required when reading CRAM.
+   * @return the current {@link HtsjdkReadsRddStorage}
+   */
   public HtsjdkReadsRddStorage referenceSourcePath(String referenceSourcePath) {
     this.referenceSourcePath = referenceSourcePath;
     return this;
   }
 
+  /**
+   * Read reads from the given path. The input files may be in any format (BAM/CRAM/SAM).
+   * @param path the file or directory to read from
+   * @return a {@link HtsjdkReadsRdd} that allows access to the reads
+   * @throws IOException if an IO error occurs while determining the format of the files and reading the header
+   */
   public HtsjdkReadsRdd read(String path) throws IOException {
     return read(path, null);
   }
 
+  /**
+   * Read reads from the given path, using the given traversal parameters to filter the reads. The input files may be
+   * in any format (BAM/CRAM/SAM).
+   * @param path the file or directory to read from
+   * @param traversalParameters parameters that determine which reads should be returned, allows filtering by interval
+   * @return a {@link HtsjdkReadsRdd} that allows access to the reads
+   * @throws IOException if an IO error occurs while determining the format of the files
+   */
   public <T extends Locatable> HtsjdkReadsRdd read(
       String path, HtsjdkReadsTraversalParameters<T> traversalParameters) throws IOException {
 
@@ -130,6 +166,16 @@ public class HtsjdkReadsRddStorage {
     return new HtsjdkReadsRdd(header, reads);
   }
 
+  /**
+   * Write reads to a file or files specified by the given path. Write options may be specified to control the format
+   * to write in (BAM/CRAM/SAM, if not clear from the path extension), and the number of files to write (single vs.
+   * multiple).
+   * @param htsjdkReadsRdd a {@link HtsjdkReadsRdd} containing the header and the reads
+   * @param path the file or directory to write to
+   * @param writeOptions options to control aspects of how to write the reads (e.g. {@link FormatWriteOption} and
+   *                     {@link FileCardinalityWriteOption}
+   * @throws IOException
+   */
   public void write(HtsjdkReadsRdd htsjdkReadsRdd, String path, WriteOption... writeOptions)
       throws IOException {
     FormatWriteOption formatWriteOption = null;
