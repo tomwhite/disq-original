@@ -28,6 +28,7 @@ below for details on each feature.
 | Indexes - read .bai/.crai       | :x:                           | :white_check_mark:            | NA                            | NA                            |
 | Indexes - read .splitting-bai   | :x:                           | NA                            | NA                            | NA                            |
 | Intervals                       | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
+| Ordering guarantees             | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Partition guarantees            | :x:                           | NA                            | :x:                           | NA                            |
 | Stringency                      | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | NA                            |
 | Testing - large files           | :x:                           | :x:                           | :x:                           | :x:                           |
@@ -126,6 +127,22 @@ For reading BAM/CRAM/SAM and VCF, a range of intervals may be specified to restr
 loaded. Intervals are specified using htsjdk's `Interval` class.
 
 For reading BAM/CRAM/SAM, when intervals are specified it is also possible to load unplaced unmapped reads if desired.
+
+### Ordering Guarantees
+
+This library does not do any sorting, so it is up to the user to understand what is being read or written. Furthermore,
+no checks are carried out to ensure that the records being read or written are consistent with the header. E.g. it
+is possible to write a BAM file whose header says it is `queryname` sorted, when in fact its records are unsorted. 
+
+For reading a single BAM/SAM file, the records in the RDD are ordered by the BAM sort order header (`unknown`,
+`unsorted`, `queryname`, or `coordinate`). For reading multiple BAM/SAM files, the records in the RDD are ordered
+within each file, and files are ordered lexicographically. If the BAM/SAM files were written using a single invocation
+of the write method in this library for an RDD that was sorted, then the RDD that is read back will retain the sort
+order, and the sort order honors the sort order in the header of any of the files (the headers will all be the same).
+If the BAM/SAM files are not globally sorted, then they should be treated as `unknown` or `unsorted`.
+
+CRAM and VCF files are always sorted by position. If reading multiple files that are not globally sorted, then they
+should be treated as unsorted, and should not be written out unless they are sorted first.
 
 ### Partition Guarantees
 
