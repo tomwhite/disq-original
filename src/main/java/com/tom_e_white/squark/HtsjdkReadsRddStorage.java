@@ -53,6 +53,7 @@ public class HtsjdkReadsRddStorage {
 
   /**
    * Create a {@link HtsjdkReadsRddStorage} from a Spark context object.
+   *
    * @param sparkContext the Spark context to use
    * @return a {@link HtsjdkReadsRddStorage}
    */
@@ -102,19 +103,23 @@ public class HtsjdkReadsRddStorage {
 
   /**
    * Read reads from the given path. The input files may be in any format (BAM/CRAM/SAM).
+   *
    * @param path the file or directory to read from
    * @return a {@link HtsjdkReadsRdd} that allows access to the reads
-   * @throws IOException if an IO error occurs while determining the format of the files and reading the header
+   * @throws IOException if an IO error occurs while determining the format of the files and reading
+   *     the header
    */
   public HtsjdkReadsRdd read(String path) throws IOException {
     return read(path, null);
   }
 
   /**
-   * Read reads from the given path, using the given traversal parameters to filter the reads. The input files may be
-   * in any format (BAM/CRAM/SAM).
+   * Read reads from the given path, using the given traversal parameters to filter the reads. The
+   * input files may be in any format (BAM/CRAM/SAM).
+   *
    * @param path the file or directory to read from
-   * @param traversalParameters parameters that determine which reads should be returned, allows filtering by interval
+   * @param traversalParameters parameters that determine which reads should be returned, allows
+   *     filtering by interval
    * @return a {@link HtsjdkReadsRdd} that allows access to the reads
    * @throws IOException if an IO error occurs while determining the format of the files
    */
@@ -167,13 +172,14 @@ public class HtsjdkReadsRddStorage {
   }
 
   /**
-   * Write reads to a file or files specified by the given path. Write options may be specified to control the format
-   * to write in (BAM/CRAM/SAM, if not clear from the path extension), and the number of files to write (single vs.
-   * multiple).
+   * Write reads to a file or files specified by the given path. Write options may be specified to
+   * control the format to write in (BAM/CRAM/SAM, if not clear from the path extension), and the
+   * number of files to write (single vs. multiple).
+   *
    * @param htsjdkReadsRdd a {@link HtsjdkReadsRdd} containing the header and the reads
    * @param path the file or directory to write to
-   * @param writeOptions options to control aspects of how to write the reads (e.g. {@link FormatWriteOption} and
-   *                     {@link FileCardinalityWriteOption}
+   * @param writeOptions options to control aspects of how to write the reads (e.g. {@link
+   *     FormatWriteOption} and {@link FileCardinalityWriteOption}
    * @throws IOException
    */
   public void write(HtsjdkReadsRdd htsjdkReadsRdd, String path, WriteOption... writeOptions)

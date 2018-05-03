@@ -42,6 +42,7 @@ public class HtsjdkVariantsRddStorage {
 
   /**
    * Create a {@link HtsjdkVariantsRddStorage} from a Spark context object.
+   *
    * @param sparkContext the Spark context to use
    * @return a {@link HtsjdkVariantsRddStorage}
    */
@@ -64,6 +65,7 @@ public class HtsjdkVariantsRddStorage {
 
   /**
    * Read variants from the given path. The input files must be VCF format, optionally compressed.
+   *
    * @param path the file or directory to read from
    * @return a {@link HtsjdkVariantsRdd} that allows access to the variants
    * @throws IOException if an IO error occurs while reading the header
@@ -73,8 +75,9 @@ public class HtsjdkVariantsRddStorage {
   }
 
   /**
-   * Read variants from the given path, using the given intervals to filter the variants. The input files must be VCF
-   * format, optionally compressed.
+   * Read variants from the given path, using the given intervals to filter the variants. The input
+   * files must be VCF format, optionally compressed.
+   *
    * @param path the file or directory to read from
    * @param intervals intervals to filter variants by
    * @return a {@link HtsjdkVariantsRdd} that allows access to the variants
@@ -90,13 +93,14 @@ public class HtsjdkVariantsRddStorage {
   }
 
   /**
-   * Write variants to a file or files specified by the given path. Write options may be specified to control the format
-   * and compression options to use (if not clear from the path extension), and the number of files to write (single vs.
-   * multiple).
+   * Write variants to a file or files specified by the given path. Write options may be specified
+   * to control the format and compression options to use (if not clear from the path extension),
+   * and the number of files to write (single vs. multiple).
+   *
    * @param htsjdkVariantsRdd a {@link HtsjdkVariantsRdd} containing the header and the variants
    * @param path the file or directory to write to
-   * @param writeOptions options to control aspects of how to write the variants (e.g. {@link FormatWriteOption} and
-   *                     {@link FileCardinalityWriteOption}
+   * @param writeOptions options to control aspects of how to write the variants (e.g. {@link
+   *     FormatWriteOption} and {@link FileCardinalityWriteOption}
    * @throws IOException
    */
   public void write(HtsjdkVariantsRdd htsjdkVariantsRdd, String path, WriteOption... writeOptions)

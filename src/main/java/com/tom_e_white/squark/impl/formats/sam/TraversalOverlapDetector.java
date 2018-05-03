@@ -5,27 +5,31 @@ import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.samtools.util.OverlapDetector;
 
-// TODO: it would be nice if htsjdk's OverlapDetector was extensible
-class TraversalOverlapDetector<T extends Locatable> {
+import java.util.List;
+
+class TraversalOverlapDetector<T extends Locatable> extends OverlapDetector<T> {
   private final boolean traverseUnplacedUnmapped;
-  private final OverlapDetector<T> overlapDetector;
 
   public TraversalOverlapDetector(HtsjdkReadsTraversalParameters<T> traversalParameters) {
+    super(0, 0);
     this.traverseUnplacedUnmapped = traversalParameters.getTraverseUnplacedUnmapped();
-    if (traversalParameters.getIntervalsForTraversal() == null
-        || traversalParameters.getIntervalsForTraversal().isEmpty()) {
-      this.overlapDetector = null; // no intervals means 'no mapped reads'
-    } else {
-      this.overlapDetector = OverlapDetector.create(traversalParameters.getIntervalsForTraversal());
+    if (traversalParameters.getIntervalsForTraversal() != null
+        && !traversalParameters.getIntervalsForTraversal().isEmpty()) {
+      List<T> intervals = traversalParameters.getIntervalsForTraversal();
+      addAll(intervals, intervals);
     }
   }
 
-  public boolean overlapsAny(SAMRecord record) {
-    if (traverseUnplacedUnmapped
-        && record.getReadUnmappedFlag()
-        && record.getAlignmentStart() == SAMRecord.NO_ALIGNMENT_START) {
-      return true; // include record if unmapped records should be traversed and record is unmapped
+  @Override
+  public boolean overlapsAny(Locatable locatable) {
+    if (traverseUnplacedUnmapped && locatable instanceof SAMRecord) {
+      SAMRecord record = (SAMRecord) locatable;
+      if (record.getReadUnmappedFlag()
+          && record.getAlignmentStart() == SAMRecord.NO_ALIGNMENT_START) {
+        return true; // include record if unmapped records should be traversed and record is
+                     // unmapped
+      }
     }
-    return overlapDetector != null && overlapDetector.overlapsAny(record);
+    return super.overlapsAny(locatable);
   }
 }
