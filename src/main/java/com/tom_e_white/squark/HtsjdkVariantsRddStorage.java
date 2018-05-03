@@ -80,6 +80,7 @@ public class HtsjdkVariantsRddStorage {
    *
    * @param path the file or directory to read from
    * @param intervals intervals to filter variants by
+   * @param <T> the type of Locatable for specifying intervals
    * @return a {@link HtsjdkVariantsRdd} that allows access to the variants
    * @throws IOException if an IO error occurs while reading the header
    */
@@ -101,7 +102,7 @@ public class HtsjdkVariantsRddStorage {
    * @param path the file or directory to write to
    * @param writeOptions options to control aspects of how to write the variants (e.g. {@link
    *     FormatWriteOption} and {@link FileCardinalityWriteOption}
-   * @throws IOException
+   * @throws IOException if an IO error occurs while writing
    */
   public void write(HtsjdkVariantsRdd htsjdkVariantsRdd, String path, WriteOption... writeOptions)
       throws IOException {

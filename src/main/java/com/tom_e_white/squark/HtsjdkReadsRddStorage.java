@@ -120,6 +120,7 @@ public class HtsjdkReadsRddStorage {
    * @param path the file or directory to read from
    * @param traversalParameters parameters that determine which reads should be returned, allows
    *     filtering by interval
+   * @param <T> the type of Locatable for specifying intervals
    * @return a {@link HtsjdkReadsRdd} that allows access to the reads
    * @throws IOException if an IO error occurs while determining the format of the files
    */
@@ -180,7 +181,7 @@ public class HtsjdkReadsRddStorage {
    * @param path the file or directory to write to
    * @param writeOptions options to control aspects of how to write the reads (e.g. {@link
    *     FormatWriteOption} and {@link FileCardinalityWriteOption}
-   * @throws IOException
+   * @throws IOException if an IO error occurs while writing
    */
   public void write(HtsjdkReadsRdd htsjdkReadsRdd, String path, WriteOption... writeOptions)
       throws IOException {

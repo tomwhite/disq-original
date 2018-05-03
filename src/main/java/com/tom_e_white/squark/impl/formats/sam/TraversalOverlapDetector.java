@@ -4,7 +4,6 @@ import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.samtools.util.OverlapDetector;
-
 import java.util.List;
 
 class TraversalOverlapDetector<T extends Locatable> extends OverlapDetector<T> {
@@ -27,7 +26,7 @@ class TraversalOverlapDetector<T extends Locatable> extends OverlapDetector<T> {
       if (record.getReadUnmappedFlag()
           && record.getAlignmentStart() == SAMRecord.NO_ALIGNMENT_START) {
         return true; // include record if unmapped records should be traversed and record is
-                     // unmapped
+        // unmapped
       }
     }
     return super.overlapsAny(locatable);
