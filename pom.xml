@@ -76,7 +76,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.0.0</version>
                 <configuration>
-                    <excludePackageNames>com.tom_e_white.squark.impl.*,htsjdk.samtools</excludePackageNames>
+                    <excludePackageNames>com.tom_e_white.squark.impl.*,htsjdk.*</excludePackageNames>
                     <failOnError>true</failOnError>
                 </configuration>
                 <executions>
