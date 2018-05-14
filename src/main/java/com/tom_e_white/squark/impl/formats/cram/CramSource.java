@@ -11,7 +11,6 @@ import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import com.tom_e_white.squark.impl.formats.sam.SamFormat;
-import htsjdk.samtools.AbstractBAMFileIndex;
 import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
 import htsjdk.samtools.BAMIndex;
@@ -171,8 +170,8 @@ public class CramSource extends AbstractSamSource implements Serializable {
                     // add on unplaced unmapped reads if there are any in this range
                     if (traversal.getTraverseUnplacedUnmapped()) {
                       long startOfLastLinearBin = idx.getStartOfLastLinearBin();
-                      long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
-                      if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
+                      // noCoordinateCount always seems to be 0, so ignore
+                      if (startOfLastLinearBin != -1) {
                         long unplacedUnmappedStart = startOfLastLinearBin;
                         if (readRange.getChunkStart() <= unplacedUnmappedStart
                             && unplacedUnmappedStart < readRange.getChunkEnd()) { // TODO correct?

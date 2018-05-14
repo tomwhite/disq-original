@@ -10,7 +10,6 @@ import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Assert;
@@ -164,9 +163,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
       {null, new HtsjdkReadsTraversalParameters<>(null, true), FormatWriteOption.BAM},
       {
         null,
-        new HtsjdkReadsTraversalParameters<>(
-            Collections.emptyList(),
-            true),
+        new HtsjdkReadsTraversalParameters<>(Collections.emptyList(), true),
         FormatWriteOption.BAM
       },
       {
@@ -187,19 +184,21 @@ public class HtsjdkReadsRddTest extends BaseTest {
             false),
         FormatWriteOption.CRAM
       },
-      //        {
-      //            "test.fa",
-      //            new HtsjdkReadsTraversalParameters<>(Arrays.asList(
-      //                new Interval("chr21", 5000, 9999), // includes two unpaired fragments
-      //                new Interval("chr21", 20000, 22999)
-      //            ), true),
-      //            FormatWriteOption.CRAM
-      //        },
-      //        {
-      //            "test.fa",
-      //            new HtsjdkReadsTraversalParameters<>(null, true),
-      //            FormatWriteOption.CRAM
-      //        },
+      {
+        "test.fa",
+        new HtsjdkReadsTraversalParameters<>(
+            Arrays.asList(
+                new Interval("chr21", 5000, 9999), // includes two unpaired fragments
+                new Interval("chr21", 20000, 22999)),
+            true),
+        FormatWriteOption.CRAM
+      },
+      {"test.fa", new HtsjdkReadsTraversalParameters<>(null, true), FormatWriteOption.CRAM},
+      {
+        "test.fa",
+        new HtsjdkReadsTraversalParameters<>(Collections.emptyList(), true),
+        FormatWriteOption.CRAM
+      },
       {
         null,
         new HtsjdkReadsTraversalParameters<>(
@@ -230,9 +229,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
       {null, new HtsjdkReadsTraversalParameters<>(null, true), FormatWriteOption.SAM},
       {
         null,
-        new HtsjdkReadsTraversalParameters<>(
-            Collections.emptyList(),
-            true),
+        new HtsjdkReadsTraversalParameters<>(Collections.emptyList(), true),
         FormatWriteOption.SAM
       },
     };
