@@ -139,7 +139,8 @@ public class CramSource extends AbstractSamSource implements Serializable {
                     SAMSequenceDictionary dict = header.getSequenceDictionary();
                     BAMIndex idx = samReader.indexing().getIndex();
                     Iterator<SAMRecord> intervalReadsIterator;
-                    if (traversal.getIntervalsForTraversal() == null) {
+                    if (traversal.getIntervalsForTraversal() == null
+                        || traversal.getIntervalsForTraversal().isEmpty()) {
                       intervalReadsIterator = Collections.emptyIterator();
                       samReader.close(); // not needed
                     } else {

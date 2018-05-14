@@ -177,7 +177,8 @@ public class BamSource extends AbstractSamSource implements Serializable {
                     }
                     BAMIndex idx = samReader.indexing().getIndex();
                     Iterator<SAMRecord> intervalReadsIterator;
-                    if (traversal.getIntervalsForTraversal() == null) {
+                    if (traversal.getIntervalsForTraversal() == null
+                        || traversal.getIntervalsForTraversal().isEmpty()) {
                       intervalReadsIterator = Collections.emptyIterator();
                     } else {
                       QueryInterval[] queryIntervals =

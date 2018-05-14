@@ -9,6 +9,8 @@ import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Assert;
@@ -161,6 +163,13 @@ public class HtsjdkReadsRddTest extends BaseTest {
       },
       {null, new HtsjdkReadsTraversalParameters<>(null, true), FormatWriteOption.BAM},
       {
+        null,
+        new HtsjdkReadsTraversalParameters<>(
+            Collections.emptyList(),
+            true),
+        FormatWriteOption.BAM
+      },
+      {
         "test.fa",
         new HtsjdkReadsTraversalParameters<>(
             Arrays.asList(
@@ -215,6 +224,14 @@ public class HtsjdkReadsRddTest extends BaseTest {
             Arrays.asList(
                 new Interval("chr21", 5000, 9999), // includes two unpaired fragments
                 new Interval("chr21", 20000, 22999)),
+            true),
+        FormatWriteOption.SAM
+      },
+      {null, new HtsjdkReadsTraversalParameters<>(null, true), FormatWriteOption.SAM},
+      {
+        null,
+        new HtsjdkReadsTraversalParameters<>(
+            Collections.emptyList(),
             true),
         FormatWriteOption.SAM
       },

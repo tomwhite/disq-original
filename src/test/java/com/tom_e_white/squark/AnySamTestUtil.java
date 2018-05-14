@@ -177,7 +177,7 @@ public class AnySamTestUtil {
       Iterator<SAMRecord> it;
       if (traversalParameters == null) {
         it = bamReader.iterator();
-      } else if (traversalParameters.getIntervalsForTraversal() == null) {
+      } else if (traversalParameters.getIntervalsForTraversal() == null || traversalParameters.getIntervalsForTraversal().isEmpty()) {
         it = Collections.emptyIterator();
       } else {
         SAMSequenceDictionary sequenceDictionary =
