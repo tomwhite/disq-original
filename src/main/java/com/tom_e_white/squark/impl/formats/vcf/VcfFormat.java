@@ -3,15 +3,17 @@ package com.tom_e_white.squark.impl.formats.vcf;
 import com.tom_e_white.squark.HtsjdkVariantsRddStorage;
 
 public enum VcfFormat {
-  VCF(".vcf", false),
-  VCF_BGZ(".vcf.bgz", true),
-  VCF_GZ(".vcf.gz", true);
+  VCF(".vcf", ".idx", false),
+  VCF_BGZ(".vcf.bgz", ".tbi", true),
+  VCF_GZ(".vcf.gz", ".tbi", true);
 
   private String extension;
+  private String indexExtension;
   private boolean compressed;
 
-  VcfFormat(String extension, boolean compressed) {
+  VcfFormat(String extension, String indexExtension, boolean compressed) {
     this.extension = extension;
+    this.indexExtension = indexExtension;
     this.compressed = compressed;
   }
 
@@ -20,7 +22,7 @@ public enum VcfFormat {
   }
 
   public String getIndexExtension() {
-    return extension + ".tbi";
+    return indexExtension;
   }
 
   public boolean fileMatches(String path) {

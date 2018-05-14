@@ -3,7 +3,7 @@ package com.tom_e_white.squark.impl.formats.tabix;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.index.Block;
-import htsjdk.tribble.index.tabix.TabixIndex;
+import htsjdk.tribble.index.Index;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,21 +13,21 @@ import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 
 /**
- * A {@link TextInputFormat} that uses a tabix index to filter out any splits that don't overlap any
- * interval in a given set. Note that this format is not aware of the record type, so it cannot
+ * A {@link TextInputFormat} that uses a tribble index to filter out any splits that don't overlap
+ * any interval in a given set. Note that this format is not aware of the record type, so it cannot
  * filter records - this must be done by the code using this class.
  */
-public class TabixIntervalFilteringTextInputFormat extends TextInputFormat {
+public class TribbleIndexIntervalFilteringTextInputFormat extends TextInputFormat {
 
-  private static TabixIndex tabixIndex;
+  private static Index index;
   private static List<? extends Locatable> intervals;
 
-  public static void setTabixIndex(TabixIndex tabixIndex) {
-    TabixIntervalFilteringTextInputFormat.tabixIndex = tabixIndex;
+  public static void setIndex(Index index) {
+    TribbleIndexIntervalFilteringTextInputFormat.index = index;
   }
 
   public static void setIntervals(List<? extends Locatable> intervals) {
-    TabixIntervalFilteringTextInputFormat.intervals = intervals;
+    TribbleIndexIntervalFilteringTextInputFormat.intervals = intervals;
   }
 
   @Override
@@ -41,7 +41,7 @@ public class TabixIntervalFilteringTextInputFormat extends TextInputFormat {
       String contig = interval.getContig();
       int intervalStart = interval.getStart();
       int intervalEnd = interval.getEnd();
-      blocks.addAll(tabixIndex.getBlocks(contig, intervalStart, intervalEnd));
+      blocks.addAll(index.getBlocks(contig, intervalStart, intervalEnd));
     }
     for (InputSplit split : splits) {
       if (!(split instanceof FileSplit)) {

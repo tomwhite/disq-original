@@ -4,14 +4,17 @@ import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.formats.bgzf.BGZFCodec;
 import com.tom_e_white.squark.impl.formats.bgzf.BGZFEnhancedGzipCodec;
-import com.tom_e_white.squark.impl.formats.tabix.TabixIntervalFilteringTextInputFormat;
+import com.tom_e_white.squark.impl.formats.tabix.TribbleIndexIntervalFilteringTextInputFormat;
+import htsjdk.samtools.Defaults;
 import htsjdk.samtools.SamStreams;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedInputStream;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.samtools.util.OverlapDetector;
 import htsjdk.tribble.FeatureCodecHeader;
-import htsjdk.tribble.index.tabix.TabixIndex;
+import htsjdk.tribble.TribbleException;
+import htsjdk.tribble.index.Index;
+import htsjdk.tribble.index.IndexFactory;
 import htsjdk.tribble.readers.AsciiLineReader;
 import htsjdk.tribble.readers.AsciiLineReaderIterator;
 import htsjdk.tribble.util.TabixUtils;
@@ -19,10 +22,9 @@ import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFCodec;
 import htsjdk.variant.vcf.VCFHeader;
 import htsjdk.variant.vcf.VCFHeaderVersion;
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Serializable;
+import java.io.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -126,13 +128,25 @@ public class VcfSource implements Serializable {
           .map(pair -> pair._2.toString())
           .setName(path);
     } else {
-      try (InputStream indexIn = findIndex(conf, path)) {
-        TabixIndex tabixIndex = new TabixIndex(indexIn);
-        TabixIntervalFilteringTextInputFormat.setTabixIndex(tabixIndex);
-        TabixIntervalFilteringTextInputFormat.setIntervals(intervals);
+      String indexPath;
+      VcfFormat vcfFormat = VcfFormat.fromPath(path);
+      if (vcfFormat == null) {
+        indexPath = path + TabixUtils.STANDARD_INDEX_EXTENSION; // try tabix
+      } else {
+        indexPath = path + vcfFormat.getIndexExtension();
+      }
+      if (!fileSystemWrapper.exists(conf, indexPath)) {
+        throw new IllegalArgumentException(
+            "Intervals set but no index file found for " + path + " at " + indexPath);
+      }
+      try (InputStream indexIn =
+          indexFileInputStream(indexPath, fileSystemWrapper.open(conf, indexPath))) {
+        Index index = loadIndex(indexPath, indexIn);
+        TribbleIndexIntervalFilteringTextInputFormat.setIndex(index);
+        TribbleIndexIntervalFilteringTextInputFormat.setIntervals(intervals);
         return jsc.newAPIHadoopFile(
                 path,
-                TabixIntervalFilteringTextInputFormat.class,
+                TribbleIndexIntervalFilteringTextInputFormat.class,
                 LongWritable.class,
                 Text.class,
                 jsc.hadoopConfiguration())
@@ -142,13 +156,40 @@ public class VcfSource implements Serializable {
     }
   }
 
-  private InputStream findIndex(Configuration conf, String path) throws IOException {
-    String index = path + TabixUtils.STANDARD_INDEX_EXTENSION;
-    if (fileSystemWrapper.exists(conf, index)) {
-      return new BlockCompressedInputStream(fileSystemWrapper.open(conf, index));
+  // TODO: adapted from htsjdk - figure out how to share code
+  public static Index loadIndex(String indexFile, InputStream in) {
+    // Must be buffered, because getIndexType uses mark and reset
+    try (BufferedInputStream bufferedInputStream =
+        new BufferedInputStream(in, Defaults.NON_ZERO_BUFFER_SIZE)) {
+      final Class<Index> indexClass =
+          IndexFactory.IndexType.getIndexType(bufferedInputStream).getIndexType();
+      final Constructor<Index> ctor = indexClass.getConstructor(InputStream.class);
+      return ctor.newInstance(bufferedInputStream);
+    } catch (final TribbleException ex) {
+      throw ex;
+    } catch (final IOException ex) {
+      throw new TribbleException.UnableToReadIndexFile("Unable to read index file", indexFile, ex);
+    } catch (final InvocationTargetException ex) {
+      if (ex.getCause() instanceof EOFException) {
+        throw new TribbleException.CorruptedIndexFile("Index file is corrupted", indexFile, ex);
+      }
+      throw new RuntimeException(ex);
+    } catch (final Exception ex) {
+      throw new RuntimeException(ex);
     }
-    throw new IllegalArgumentException("Intervals set but no tabix index file found for " + path);
   }
+
+  private static InputStream indexFileInputStream(String indexPath, InputStream inputStreamInitial)
+      throws IOException {
+    if (indexPath.endsWith(".gz")) {
+      return new GZIPInputStream(inputStreamInitial);
+    } else if (indexPath.endsWith(TabixUtils.STANDARD_INDEX_EXTENSION)) {
+      return new BlockCompressedInputStream(inputStreamInitial);
+    } else {
+      return inputStreamInitial;
+    }
+  }
+  // end from htsjdk
 
   private static <T> Stream<T> stream(final Iterator<T> iterator) {
     return StreamSupport.stream(((Iterable<T>) () -> iterator).spliterator(), false);
