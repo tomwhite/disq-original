@@ -6,11 +6,7 @@ import htsjdk.samtools.util.Interval;
 import htsjdk.tribble.util.TabixUtils;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URI;
 import java.util.Iterator;
 
@@ -34,6 +30,10 @@ public class VcfTestUtil {
       actualVcf = vcf;
     }
     return new VCFFileReader(actualVcf, false);
+  }
+
+  public static int countVariants(final String vcfPath) throws IOException {
+    return countVariants(vcfPath, null);
   }
 
   public static int countVariants(final String vcfPath, Interval interval) throws IOException {

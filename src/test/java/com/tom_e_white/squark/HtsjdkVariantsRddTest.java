@@ -43,7 +43,7 @@ public class HtsjdkVariantsRddTest extends BaseTest {
     HtsjdkVariantsRdd htsjdkVariantsRdd = htsjdkVariantsRddStorage.read(inputPath);
 
     // read the file using htsjdk to get expected number of reads, then count the number in the RDD
-    int expectedCount = countVariants(inputPath, null);
+    int expectedCount = countVariants(inputPath);
     Assert.assertEquals(expectedCount, htsjdkVariantsRdd.getVariants().count());
 
     // write the RDD back to a file
@@ -55,7 +55,7 @@ public class HtsjdkVariantsRddTest extends BaseTest {
         "block compressed",
         outputVcfFormat.isCompressed(),
         VcfTestUtil.isBlockCompressed(outputPath));
-    Assert.assertEquals(expectedCount, countVariants(outputPath, null));
+    Assert.assertEquals(expectedCount, countVariants(outputPath));
     if (BcftoolsTestUtil.isBcftoolsAvailable()) {
       Assert.assertEquals(expectedCount, BcftoolsTestUtil.countVariants(outputPath));
     }
@@ -90,7 +90,7 @@ public class HtsjdkVariantsRddTest extends BaseTest {
 
     // read the file using htsjdk to get expected number of variants, then count the number in the
     // RDD
-    int expectedCount = countVariants(inputPath, null);
+    int expectedCount = countVariants(inputPath);
     Assert.assertEquals(expectedCount, htsjdkVariantsRdd.getVariants().count());
 
     // write as multiple VCF files
@@ -104,7 +104,7 @@ public class HtsjdkVariantsRddTest extends BaseTest {
     // check the new file has the number of expected variants
     int totalCount = 0;
     for (String part : listPartFiles(outputPath)) {
-      totalCount += countVariants(part, null);
+      totalCount += countVariants(part);
     }
     Assert.assertEquals(expectedCount, totalCount);
 
@@ -146,5 +146,28 @@ public class HtsjdkVariantsRddTest extends BaseTest {
 
     int expectedCount = countVariants(inputPath, interval);
     Assert.assertEquals(expectedCount, variants.count());
+  }
+
+  @Test
+  public void testOverwrite() throws IOException, URISyntaxException {
+    String inputPath = getPath("test.vcf");
+
+    HtsjdkVariantsRddStorage htsjdkVariantsRddStorage =
+        HtsjdkVariantsRddStorage.makeDefault(jsc).splitSize(128 * 1024);
+
+    HtsjdkVariantsRdd htsjdkVariantsRdd = htsjdkVariantsRddStorage.read(inputPath);
+    int originalCount = countVariants(inputPath);
+
+    // sample the variants
+    JavaRDD<VariantContext> sample = htsjdkVariantsRdd.getVariants().sample(false, 0.5);
+    HtsjdkVariantsRdd htsjdkVariantsSampleRdd =
+        new HtsjdkVariantsRdd(htsjdkVariantsRdd.getHeader(), sample);
+
+    // overwrite input with smaller sample
+    htsjdkVariantsRddStorage.write(htsjdkVariantsSampleRdd, inputPath);
+    int newCount = countVariants(inputPath);
+
+    Assert.assertTrue(newCount > 0);
+    Assert.assertTrue(originalCount > newCount);
   }
 }

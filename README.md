@@ -47,6 +47,8 @@ Format records are represented by htsjdk types: `SAMRecord` (for BAM/CRAM/SAM) a
 
 Spark RDDs are used for the collection type.
 
+Writing files will create new files or overwrite existing files without warning.
+
 ### Filesystems
 
 Two filesystem abstractions are supported for all formats: the Hadoop filesystem (HDFS, local,

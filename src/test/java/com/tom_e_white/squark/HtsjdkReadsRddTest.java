@@ -5,13 +5,16 @@ import static com.tom_e_white.squark.AnySamTestUtil.countReads;
 import com.tom_e_white.squark.HtsjdkReadsRddStorage.FormatWriteOption;
 import com.tom_e_white.squark.impl.formats.sam.SamFormat;
 import htsjdk.samtools.SAMFileHeader;
+import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+import org.apache.spark.api.java.JavaRDD;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -289,5 +292,27 @@ public class HtsjdkReadsRddTest extends BaseTest {
 
     HtsjdkReadsRddStorage htsjdkReadsRddStorage = HtsjdkReadsRddStorage.makeDefault(jsc);
     htsjdkReadsRddStorage.write(null, outputPath); // RDD is ignored, so OK to pass in null
+  }
+
+  @Test
+  public void testOverwrite() throws IOException, URISyntaxException {
+    String inputPath = getPath("1.bam");
+
+    HtsjdkReadsRddStorage htsjdkReadsRddStorage =
+        HtsjdkReadsRddStorage.makeDefault(jsc).splitSize(128 * 1024).useNio(false);
+
+    HtsjdkReadsRdd htsjdkReadsRdd = htsjdkReadsRddStorage.read(inputPath);
+    int originalCount = countReads(inputPath);
+
+    // sample the reads
+    JavaRDD<SAMRecord> sample = htsjdkReadsRdd.getReads().sample(false, 0.5);
+    HtsjdkReadsRdd htsjdkReadsSampleRdd = new HtsjdkReadsRdd(htsjdkReadsRdd.getHeader(), sample);
+
+    // overwrite input with smaller sample
+    htsjdkReadsRddStorage.write(htsjdkReadsSampleRdd, inputPath);
+    int newCount = countReads(inputPath);
+
+    Assert.assertTrue(newCount > 0);
+    Assert.assertTrue(originalCount > newCount);
   }
 }
