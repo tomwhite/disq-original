@@ -91,12 +91,14 @@ public class CramSource extends AbstractSamSource implements Serializable {
       for (String p : paths) {
         long cramFileLength = fileSystemWrapper.getFileLength(conf, p);
         List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, p, cramFileLength);
-        pathToContainerOffsets.put(URI.create(p).getPath(), containerOffsets);
+        String normPath = URI.create(fileSystemWrapper.normalize(conf, p)).getPath();
+        pathToContainerOffsets.put(normPath, containerOffsets);
       }
     } else {
       long cramFileLength = fileSystemWrapper.getFileLength(conf, path);
       List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, path, cramFileLength);
-      pathToContainerOffsets.put(URI.create(path).getPath(), containerOffsets);
+      String normPath = URI.create(fileSystemWrapper.normalize(conf, path)).getPath();
+      pathToContainerOffsets.put(normPath, containerOffsets);
     }
     Broadcast<Map<String, List<Long>>> containerOffsetsBroadcast =
         jsc.broadcast(pathToContainerOffsets);
@@ -108,17 +110,18 @@ public class CramSource extends AbstractSamSource implements Serializable {
         .flatMap(
             (FlatMapFunction<Tuple2<Void, FileSplit>, SAMRecord>)
                 t2 -> {
+                  Configuration c = confSer.getConf();
                   FileSplit fileSplit = t2._2();
                   String p = fileSplit.getPath().toUri().toString();
                   Map<String, List<Long>> pathToOffsets = containerOffsetsBroadcast.getValue();
-                  List<Long> offsets = pathToOffsets.get(fileSplit.getPath().toUri().getPath());
+                  String normPath = URI.create(fileSystemWrapper.normalize(c, p)).getPath();
+                  List<Long> offsets = pathToOffsets.get(normPath);
                   long newStart = nextContainerOffset(offsets, fileSplit.getStart());
                   long newEnd =
                       nextContainerOffset(offsets, fileSplit.getStart() + fileSplit.getLength());
                   if (newStart == newEnd) {
                     return Collections.emptyIterator();
                   }
-                  Configuration c = confSer.getConf();
                   SamReader samReader =
                       createSamReader(c, p, validationStringency, referenceSourcePath);
                   CRAMFileReader cramFileReader = createCramFileReader(samReader);

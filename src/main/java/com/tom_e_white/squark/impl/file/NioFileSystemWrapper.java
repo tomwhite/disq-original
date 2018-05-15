@@ -18,6 +18,11 @@ import org.apache.hadoop.conf.Configuration;
 public class NioFileSystemWrapper implements FileSystemWrapper {
 
   @Override
+  public String normalize(Configuration conf, String path) {
+    return asPath(path).toAbsolutePath().normalize().toString();
+  }
+
+  @Override
   public SeekableStream open(Configuration conf, String path) throws IOException {
     return new ExtSeekableBufferedStream(new SeekablePathStream(asPath(path)));
   }

@@ -17,6 +17,13 @@ import org.apache.hadoop.io.IOUtils;
 public class HadoopFileSystemWrapper implements FileSystemWrapper {
 
   @Override
+  public String normalize(Configuration conf, String path) throws IOException {
+    Path p = new Path(path);
+    FileSystem fileSystem = p.getFileSystem(conf);
+    return fileSystem.makeQualified(p).toString();
+  }
+
+  @Override
   public SeekableStream open(Configuration conf, String path) throws IOException {
     Path p = new Path(path);
     FileSystem fileSystem = p.getFileSystem(conf);
