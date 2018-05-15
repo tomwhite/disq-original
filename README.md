@@ -165,6 +165,36 @@ All read and write paths are tested on real files from the field (multi-GB in si
 read successfully. (Version 1.4 of samtools, and 1.3 of bcftools were used. The latter was needed to avoid
 [this bug](https://github.com/samtools/bcftools/issues/420).)
 
+## Building
+
+There are no releases in Maven Central yet, so you need to build the JAR yourself by running
+
+```bash
+mvn install
+```
+
+Then to use the library in your project, add the following dependency to your Maven POM:
+
+```xml
+<dependency>
+    <groupId>com.tom_e_white</groupId>
+    <artifactId>squark</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+</dependency>
+```
+
+## Usage
+
+```java
+// First get a Spark context
+JavaSparkContext jsc = ...
+
+// Read a BAM file into a Spark RDD
+JavaRDD<SAMRecord> reads = HtsjdkReadsRddStorage.makeDefault(jsc)
+    .read("src/test/resources/1.bam")
+    .getReads();
+```
+
 ## Implementation notes for developers
 
 The library requires Java 8 or later. The surface area of the API has deliberately been kept small by exposing only a
