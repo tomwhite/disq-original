@@ -13,8 +13,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HadoopFileSystemWrapper implements FileSystemWrapper {
+
+  private static final Logger logger = LoggerFactory.getLogger(HadoopFileSystemWrapper.class);
 
   @Override
   public String normalize(Configuration conf, String path) throws IOException {
@@ -28,8 +32,7 @@ public class HadoopFileSystemWrapper implements FileSystemWrapper {
     Path p = new Path(path);
     FileSystem fileSystem = p.getFileSystem(conf);
     long len = fileSystem.getFileStatus(p).getLen();
-    return new ExtSeekableBufferedStream(
-        new SeekableHadoopStream<>(fileSystem.open(p), len, path.toString()));
+    return new ExtSeekableBufferedStream(new SeekableHadoopStream<>(fileSystem.open(p), len, path));
   }
 
   @Override
@@ -91,7 +94,7 @@ public class HadoopFileSystemWrapper implements FileSystemWrapper {
       }
       fileSystem.rename(tmp, target);
     } catch (UnsupportedOperationException e) {
-      System.out.println("Concat not supported, merging serially");
+      logger.warn("Concat not supported, merging serially");
       try (OutputStream out = create(conf, path)) {
         for (String part : parts) {
           try (InputStream in = open(conf, part)) {

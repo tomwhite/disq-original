@@ -30,17 +30,17 @@ public class SamSink extends AbstractSamSink {
       SAMFileHeader header,
       JavaRDD<SAMRecord> reads,
       String path,
-      String referenceSourcePath)
+      String referenceSourcePath,
+      String tempPartsDirectory)
       throws IOException {
 
-    String shardedDir = path + ".sharded";
-    reads.map(SAMRecord::getSAMString).map(String::trim).saveAsTextFile(shardedDir);
+    reads.map(SAMRecord::getSAMString).map(String::trim).saveAsTextFile(tempPartsDirectory);
 
-    String headerFile = shardedDir + "/header";
+    String headerFile = tempPartsDirectory + "/header";
     try (Writer out =
         new AsciiWriter(fileSystemWrapper.create(jsc.hadoopConfiguration(), headerFile))) {
       new SAMTextHeaderCodec().encode(out, header);
     }
-    new Merger().mergeParts(jsc.hadoopConfiguration(), shardedDir, path);
+    new Merger().mergeParts(jsc.hadoopConfiguration(), tempPartsDirectory, path);
   }
 }

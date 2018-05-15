@@ -14,9 +14,9 @@ public class Merger {
     fileSystemWrapper = new HadoopFileSystemWrapper();
   }
 
-  public void mergeParts(Configuration conf, String partDirectory, String outputFile)
+  public void mergeParts(Configuration conf, String tempPartsDirectory, String outputFile)
       throws IOException {
-    List<String> parts = fileSystemWrapper.listDirectory(conf, partDirectory);
+    List<String> parts = fileSystemWrapper.listDirectory(conf, tempPartsDirectory);
     List<String> filteredParts =
         parts
             .stream()

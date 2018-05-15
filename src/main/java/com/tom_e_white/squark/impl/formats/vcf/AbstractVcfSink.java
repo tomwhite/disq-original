@@ -8,6 +8,10 @@ import org.apache.spark.api.java.JavaSparkContext;
 
 public abstract class AbstractVcfSink {
   public abstract void save(
-      JavaSparkContext jsc, VCFHeader vcfHeader, JavaRDD<VariantContext> variants, String path)
+      JavaSparkContext jsc,
+      VCFHeader vcfHeader,
+      JavaRDD<VariantContext> variants,
+      String path,
+      String tempPartsDirectory)
       throws IOException;
 }

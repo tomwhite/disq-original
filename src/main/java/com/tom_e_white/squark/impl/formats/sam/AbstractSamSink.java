@@ -12,6 +12,7 @@ public abstract class AbstractSamSink {
       SAMFileHeader header,
       JavaRDD<SAMRecord> reads,
       String path,
-      String referenceSourcePath)
+      String referenceSourcePath,
+      String tempPartsDirectory)
       throws IOException;
 }

@@ -38,10 +38,10 @@ public class BamSink extends AbstractSamSink {
       SAMFileHeader header,
       JavaRDD<SAMRecord> reads,
       String path,
-      String referenceSourcePath)
+      String referenceSourcePath,
+      String tempPartsDirectory)
       throws IOException {
 
-    String shardedDir = path + ".sharded";
     Broadcast<SAMFileHeader> headerBroadcast = jsc.broadcast(header);
     reads
         .mapPartitions(
@@ -52,23 +52,23 @@ public class BamSink extends AbstractSamSink {
         .mapToPair(
             (PairFunction<SAMRecord, Void, SAMRecord>) samRecord -> new Tuple2<>(null, samRecord))
         .saveAsNewAPIHadoopFile(
-            shardedDir,
+            tempPartsDirectory,
             Void.class,
             SAMRecord.class,
             HeaderlessBamOutputFormat.class,
             jsc.hadoopConfiguration());
 
-    String headerFile = shardedDir + "/header";
+    String headerFile = tempPartsDirectory + "/header";
     try (OutputStream out = fileSystemWrapper.create(jsc.hadoopConfiguration(), headerFile)) {
       writeHeader(header, out);
     }
 
-    String terminatorFile = shardedDir + "/terminator";
+    String terminatorFile = tempPartsDirectory + "/terminator";
     try (OutputStream out = fileSystemWrapper.create(jsc.hadoopConfiguration(), terminatorFile)) {
       out.write(BlockCompressedStreamConstants.EMPTY_GZIP_BLOCK);
     }
 
-    new Merger().mergeParts(jsc.hadoopConfiguration(), shardedDir, path);
+    new Merger().mergeParts(jsc.hadoopConfiguration(), tempPartsDirectory, path);
   }
 
   private void writeHeader(SAMFileHeader header, OutputStream out) throws IOException {

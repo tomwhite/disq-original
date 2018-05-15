@@ -46,7 +46,6 @@ public class BcftoolsTestUtil {
       commandLine.addArgument(
           String.format("%s:%s-%s", interval.getContig(), interval.getStart(), interval.getEnd()));
     }
-    System.out.println(commandLine);
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     ByteArrayOutputStream errorStream = new ByteArrayOutputStream();

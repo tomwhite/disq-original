@@ -26,9 +26,12 @@ public class VcfSink extends AbstractVcfSink {
 
   @Override
   public void save(
-      JavaSparkContext jsc, VCFHeader vcfHeader, JavaRDD<VariantContext> variants, String path)
+      JavaSparkContext jsc,
+      VCFHeader vcfHeader,
+      JavaRDD<VariantContext> variants,
+      String path,
+      String tempPartsDirectory)
       throws IOException {
-    String shardedDir = path + ".sharded";
     Broadcast<VCFHeader> vcfHeaderBroadcast = jsc.broadcast(vcfHeader);
     JavaRDD<String> variantStrings =
         variants.mapPartitions(
@@ -40,11 +43,12 @@ public class VcfSink extends AbstractVcfSink {
                 });
     boolean compressed = path.endsWith(BGZFCodec.DEFAULT_EXTENSION) || path.endsWith(".gz");
     if (compressed) {
-      variantStrings.saveAsTextFile(shardedDir, BGZFCodec.class);
+      variantStrings.saveAsTextFile(tempPartsDirectory, BGZFCodec.class);
     } else {
-      variantStrings.saveAsTextFile(shardedDir);
+      variantStrings.saveAsTextFile(tempPartsDirectory);
     }
-    String headerFile = shardedDir + "/header" + (compressed ? BGZFCodec.DEFAULT_EXTENSION : "");
+    String headerFile =
+        tempPartsDirectory + "/header" + (compressed ? BGZFCodec.DEFAULT_EXTENSION : "");
     try (OutputStream headerOut = fileSystemWrapper.create(jsc.hadoopConfiguration(), headerFile)) {
       OutputStream out = compressed ? new BlockCompressedOutputStream(headerOut, null) : headerOut;
       VariantContextWriter writer =
@@ -54,11 +58,11 @@ public class VcfSink extends AbstractVcfSink {
       // terminator after the header
     }
     if (compressed) {
-      String terminatorFile = shardedDir + "/terminator";
+      String terminatorFile = tempPartsDirectory + "/terminator";
       try (OutputStream out = fileSystemWrapper.create(jsc.hadoopConfiguration(), terminatorFile)) {
         out.write(BlockCompressedStreamConstants.EMPTY_GZIP_BLOCK);
       }
     }
-    new Merger().mergeParts(jsc.hadoopConfiguration(), shardedDir, path);
+    new Merger().mergeParts(jsc.hadoopConfiguration(), tempPartsDirectory, path);
   }
 }

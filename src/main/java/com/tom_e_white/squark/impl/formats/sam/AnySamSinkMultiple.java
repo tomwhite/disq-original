@@ -20,8 +20,8 @@ import scala.Tuple2;
  * Write reads to multiple BAM/CRAM/SAM files in a directory on Spark. This is more efficient than
  * {@link com.tom_e_white.squark.impl.formats.bam.BamSink}, {@link
  * com.tom_e_white.squark.impl.formats.cram.CramSink}, and {@link SamSink} since it avoids the cost
- * of merging the headerless files at the end, however it multiple files may not be as easy to
- * consume for some external systems.
+ * of merging the headerless files at the end, however multiple files may not be as easy to consume
+ * for some external systems.
  *
  * @see com.tom_e_white.squark.impl.formats.bam.BamSink
  * @see com.tom_e_white.squark.impl.formats.cram.CramSink
@@ -42,7 +42,8 @@ public class AnySamSinkMultiple extends AbstractSamSink implements Serializable 
       SAMFileHeader header,
       JavaRDD<SAMRecord> reads,
       String path,
-      String referenceSourcePath)
+      String referenceSourcePath,
+      String tempPartsDirectory)
       throws IOException {
 
     FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();

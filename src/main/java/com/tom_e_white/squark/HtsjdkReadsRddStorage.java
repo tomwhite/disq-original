@@ -45,6 +45,22 @@ public class HtsjdkReadsRddStorage {
     MULTIPLE
   }
 
+  /**
+   * An option for controlling which directory to write temporary part files to when writing a
+   * {@link HtsjdkReadsRdd} as a single file.
+   */
+  public static class TempPartsDirectoryWriteOption implements WriteOption {
+    private String tempPartsDirectory;
+
+    public TempPartsDirectoryWriteOption(String tempPartsDirectory) {
+      this.tempPartsDirectory = tempPartsDirectory;
+    }
+
+    String getTempPartsDirectory() {
+      return tempPartsDirectory;
+    }
+  }
+
   private JavaSparkContext sparkContext;
   private int splitSize;
   private ValidationStringency validationStringency = ValidationStringency.DEFAULT_STRINGENCY;
@@ -187,11 +203,14 @@ public class HtsjdkReadsRddStorage {
       throws IOException {
     FormatWriteOption formatWriteOption = null;
     FileCardinalityWriteOption fileCardinalityWriteOption = null;
+    TempPartsDirectoryWriteOption tempPartsDirectoryWriteOption = null;
     for (WriteOption writeOption : writeOptions) {
       if (writeOption instanceof FormatWriteOption) {
         formatWriteOption = (FormatWriteOption) writeOption;
       } else if (writeOption instanceof FileCardinalityWriteOption) {
         fileCardinalityWriteOption = (FileCardinalityWriteOption) writeOption;
+      } else if (writeOption instanceof TempPartsDirectoryWriteOption) {
+        tempPartsDirectoryWriteOption = (TempPartsDirectoryWriteOption) writeOption;
       }
     }
 
@@ -208,13 +227,21 @@ public class HtsjdkReadsRddStorage {
       fileCardinalityWriteOption = inferCardinalityFromPath(path);
     }
 
+    String tempPartsDirectory = null;
+    if (tempPartsDirectoryWriteOption != null) {
+      tempPartsDirectory = tempPartsDirectoryWriteOption.getTempPartsDirectory();
+    } else if (fileCardinalityWriteOption == FileCardinalityWriteOption.SINGLE) {
+      tempPartsDirectory = path + ".parts";
+    }
+
     getSink(formatWriteOption, fileCardinalityWriteOption)
         .save(
             sparkContext,
             htsjdkReadsRdd.getHeader(),
             htsjdkReadsRdd.getReads(),
             path,
-            referenceSourcePath);
+            referenceSourcePath,
+            tempPartsDirectory);
   }
 
   private FormatWriteOption inferFormatFromPath(String path) {

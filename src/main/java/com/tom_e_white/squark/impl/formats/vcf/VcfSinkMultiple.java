@@ -19,7 +19,11 @@ public class VcfSinkMultiple extends AbstractVcfSink implements Serializable {
 
   @Override
   public void save(
-      JavaSparkContext jsc, VCFHeader vcfHeader, JavaRDD<VariantContext> variants, String path) {
+      JavaSparkContext jsc,
+      VCFHeader vcfHeader,
+      JavaRDD<VariantContext> variants,
+      String path,
+      String tempPartsDirectory) {
     Broadcast<VCFHeader> headerBroadcast = jsc.broadcast(vcfHeader);
     variants
         .mapPartitions(

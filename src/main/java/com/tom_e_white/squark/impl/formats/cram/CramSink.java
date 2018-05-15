@@ -38,10 +38,10 @@ public class CramSink extends AbstractSamSink {
       SAMFileHeader header,
       JavaRDD<SAMRecord> reads,
       String path,
-      String referenceSourcePath)
+      String referenceSourcePath,
+      String tempPartsDirectory)
       throws IOException {
 
-    String shardedDir = path + ".sharded";
     ReferenceSource referenceSource =
         new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath));
     Broadcast<SAMFileHeader> headerBroadcast = jsc.broadcast(header);
@@ -56,23 +56,23 @@ public class CramSink extends AbstractSamSink {
         .mapToPair(
             (PairFunction<SAMRecord, Void, SAMRecord>) samRecord -> new Tuple2<>(null, samRecord))
         .saveAsNewAPIHadoopFile(
-            shardedDir,
+            tempPartsDirectory,
             Void.class,
             SAMRecord.class,
             CramOutputFormat.class,
             jsc.hadoopConfiguration());
 
-    String headerFile = shardedDir + "/header";
+    String headerFile = tempPartsDirectory + "/header";
     try (OutputStream out = fileSystemWrapper.create(jsc.hadoopConfiguration(), headerFile)) {
       writeHeader(header, out, headerFile, referenceSource);
     }
 
-    String terminatorFile = shardedDir + "/terminator";
+    String terminatorFile = tempPartsDirectory + "/terminator";
     try (OutputStream out = fileSystemWrapper.create(jsc.hadoopConfiguration(), terminatorFile)) {
       CramIO.issueEOF(CramVersions.DEFAULT_CRAM_VERSION, out);
     }
 
-    new Merger().mergeParts(jsc.hadoopConfiguration(), shardedDir, path);
+    new Merger().mergeParts(jsc.hadoopConfiguration(), tempPartsDirectory, path);
   }
 
   private void writeHeader(
