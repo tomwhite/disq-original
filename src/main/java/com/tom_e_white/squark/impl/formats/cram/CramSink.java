@@ -73,6 +73,7 @@ public class CramSink extends AbstractSamSink {
     }
 
     new Merger().mergeParts(jsc.hadoopConfiguration(), tempPartsDirectory, path);
+    fileSystemWrapper.delete(jsc.hadoopConfiguration(), tempPartsDirectory);
   }
 
   private void writeHeader(

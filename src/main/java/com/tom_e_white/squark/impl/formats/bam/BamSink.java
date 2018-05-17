@@ -69,6 +69,7 @@ public class BamSink extends AbstractSamSink {
     }
 
     new Merger().mergeParts(jsc.hadoopConfiguration(), tempPartsDirectory, path);
+    fileSystemWrapper.delete(jsc.hadoopConfiguration(), tempPartsDirectory);
   }
 
   private void writeHeader(SAMFileHeader header, OutputStream out) throws IOException {

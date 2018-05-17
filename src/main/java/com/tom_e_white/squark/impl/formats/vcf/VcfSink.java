@@ -64,5 +64,6 @@ public class VcfSink extends AbstractVcfSink {
       }
     }
     new Merger().mergeParts(jsc.hadoopConfiguration(), tempPartsDirectory, path);
+    fileSystemWrapper.delete(jsc.hadoopConfiguration(), tempPartsDirectory);
   }
 }

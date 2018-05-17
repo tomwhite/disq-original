@@ -6,6 +6,7 @@ import com.tom_e_white.squark.HtsjdkVariantsRddStorage.FormatWriteOption;
 import com.tom_e_white.squark.impl.formats.vcf.VcfFormat;
 import htsjdk.samtools.util.Interval;
 import htsjdk.variant.variantcontext.VariantContext;
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Collections;
@@ -156,18 +157,12 @@ public class HtsjdkVariantsRddTest extends BaseTest {
         HtsjdkVariantsRddStorage.makeDefault(jsc).splitSize(128 * 1024);
 
     HtsjdkVariantsRdd htsjdkVariantsRdd = htsjdkVariantsRddStorage.read(inputPath);
-    int originalCount = countVariants(inputPath);
+    int expectedCount = countVariants(inputPath);
 
-    // sample the variants
-    JavaRDD<VariantContext> sample = htsjdkVariantsRdd.getVariants().sample(false, 0.5);
-    HtsjdkVariantsRdd htsjdkVariantsSampleRdd =
-        new HtsjdkVariantsRdd(htsjdkVariantsRdd.getHeader(), sample);
-
-    // overwrite input with smaller sample
-    htsjdkVariantsRddStorage.write(htsjdkVariantsSampleRdd, inputPath);
-    int newCount = countVariants(inputPath);
-
-    Assert.assertTrue(newCount > 0);
-    Assert.assertTrue(originalCount > newCount);
+    File outputFile = createTempFile(VcfFormat.VCF.getExtension());
+    Assert.assertTrue(outputFile.createNewFile()); // create the file to check that overwrite works
+    String outputPath = outputFile.toURI().toString();
+    htsjdkVariantsRddStorage.write(htsjdkVariantsRdd, outputPath);
+    Assert.assertEquals(expectedCount, countVariants(outputPath));
   }
 }
