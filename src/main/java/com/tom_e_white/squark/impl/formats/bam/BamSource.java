@@ -5,7 +5,7 @@ import com.tom_e_white.squark.HtsjdkReadsRdd;
 import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
-import com.tom_e_white.squark.impl.file.ReadRange;
+import com.tom_e_white.squark.impl.file.PathChunk;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
@@ -69,16 +69,16 @@ public class BamSource extends AbstractSamSource implements Serializable {
   }
 
   /**
-   * @return the {@link ReadRange} for the partition, or null if there is none (e.g. in the case of
+   * @return the {@link PathChunk} for the partition, or null if there is none (e.g. in the case of
    *     long reads, and/or very small partitions).
    */
-  private <T extends Locatable> ReadRange getFirstReadInPartition(
+  private <T extends Locatable> PathChunk getFirstReadInPartition(
       Configuration conf,
       Iterator<BgzfBlock> bgzfBlocks,
       ValidationStringency stringency,
       String referenceSourcePath)
       throws IOException {
-    ReadRange readRange = null;
+    PathChunk pathChunk = null;
     BamRecordGuesser bamRecordGuesser = null;
     try {
       String partitionPath = null;
@@ -105,7 +105,7 @@ public class BamSource extends AbstractSamSource implements Serializable {
           long vEnd = BgzfVirtualFilePointerUtil.makeFilePointer(block.end, 0xffff);
           if (bamRecordGuesser.checkRecordStart(vPos)) {
             block.end();
-            return new ReadRange(partitionPath, new Chunk(vPos, vEnd));
+            return new PathChunk(partitionPath, new Chunk(vPos, vEnd));
           }
         }
       }
@@ -114,7 +114,7 @@ public class BamSource extends AbstractSamSource implements Serializable {
         bamRecordGuesser.close();
       }
     }
-    return readRange;
+    return pathChunk;
   }
 
   private BamRecordGuesser getBamRecordGuesser(
@@ -153,17 +153,17 @@ public class BamSource extends AbstractSamSource implements Serializable {
             (FlatMapFunction<Iterator<BgzfBlock>, SAMRecord>)
                 bgzfBlocks -> {
                   Configuration c = confSer.getConf();
-                  ReadRange readRange =
+                  PathChunk pathChunk =
                       getFirstReadInPartition(
                           c, bgzfBlocks, validationStringency, referenceSourcePath);
-                  if (readRange == null) {
+                  if (pathChunk == null) {
                     return Collections.emptyIterator();
                   }
-                  String p = readRange.getPath();
+                  String p = pathChunk.getPath();
                   SamReader samReader =
                       createSamReader(c, p, validationStringency, referenceSourcePath);
                   BAMFileReader bamFileReader = createBamFileReader(samReader);
-                  BAMFileSpan splitSpan = new BAMFileSpan(readRange.getSpan());
+                  BAMFileSpan splitSpan = new BAMFileSpan(pathChunk.getSpan());
                   HtsjdkReadsTraversalParameters<T> traversal =
                       traversalParametersBroadcast == null
                           ? null
@@ -203,9 +203,9 @@ public class BamSource extends AbstractSamSource implements Serializable {
                       long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
                       if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
                         long unplacedUnmappedStart = startOfLastLinearBin;
-                        if (readRange.getSpan().getChunkStart() <= unplacedUnmappedStart
+                        if (pathChunk.getSpan().getChunkStart() <= unplacedUnmappedStart
                             && unplacedUnmappedStart
-                                < readRange.getSpan().getChunkEnd()) { // TODO correct?
+                                < pathChunk.getSpan().getChunkEnd()) { // TODO correct?
                           SamReader unplacedUnmappedReadsSamReader =
                               createSamReader(c, p, validationStringency, referenceSourcePath);
                           Iterator<SAMRecord> unplacedUnmappedReadsIterator =

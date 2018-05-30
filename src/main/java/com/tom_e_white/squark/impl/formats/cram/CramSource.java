@@ -5,7 +5,7 @@ import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.FileSplitInputFormat;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
-import com.tom_e_white.squark.impl.file.ReadRange;
+import com.tom_e_white.squark.impl.file.PathChunk;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
@@ -127,13 +127,13 @@ public class CramSource extends AbstractSamSource implements Serializable {
                   CRAMFileReader cramFileReader = createCramFileReader(samReader);
                   // TODO: test edge cases
                   // Subtract one from end since CRAMIterator's boundaries are inclusive
-                  ReadRange readRange =
-                      new ReadRange(
+                  PathChunk pathChunk =
+                      new PathChunk(
                           p,
                           new Chunk(
                               BgzfVirtualFilePointerUtil.makeFilePointer(newStart),
                               BgzfVirtualFilePointerUtil.makeFilePointer(newEnd - 1)));
-                  BAMFileSpan splitSpan = new BAMFileSpan(readRange.getSpan());
+                  BAMFileSpan splitSpan = new BAMFileSpan(pathChunk.getSpan());
                   HtsjdkReadsTraversalParameters<T> traversal =
                       traversalParametersBroadcast == null
                           ? null
@@ -183,9 +183,9 @@ public class CramSource extends AbstractSamSource implements Serializable {
                       // noCoordinateCount always seems to be 0, so ignore
                       if (startOfLastLinearBin != -1) {
                         long unplacedUnmappedStart = startOfLastLinearBin;
-                        if (readRange.getSpan().getChunkStart() <= unplacedUnmappedStart
+                        if (pathChunk.getSpan().getChunkStart() <= unplacedUnmappedStart
                             && unplacedUnmappedStart
-                                < readRange.getSpan().getChunkEnd()) { // TODO correct?
+                                < pathChunk.getSpan().getChunkEnd()) { // TODO correct?
                           SamReader unplacedUnmappedReadsSamReader =
                               createSamReader(c, p, validationStringency, referenceSourcePath);
                           Iterator<SAMRecord> unplacedUnmappedReadsIterator =

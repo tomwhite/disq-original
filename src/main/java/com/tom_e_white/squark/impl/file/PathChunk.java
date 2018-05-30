@@ -4,11 +4,11 @@ import htsjdk.samtools.Chunk;
 import java.io.Serializable;
 
 /** Stores the virtual span of a partition for a file path. */
-public class ReadRange implements Serializable {
+public class PathChunk implements Serializable {
   private final String path;
   private final Chunk span;
 
-  public ReadRange(String path, Chunk span) {
+  public PathChunk(String path, Chunk span) {
     this.path = path;
     this.span = span;
   }
