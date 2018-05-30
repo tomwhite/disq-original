@@ -50,10 +50,6 @@ public class BamSource extends AbstractSamSource implements Serializable {
 
   private final BgzfBlockSource bgzfBlockSource;
 
-  public BamSource() {
-    this(false);
-  }
-
   /**
    * @param useNio if true use the NIO filesystem APIs rather than the Hadoop filesystem APIs. This
    *     is appropriate for cloud stores where file locality is not relied upon.

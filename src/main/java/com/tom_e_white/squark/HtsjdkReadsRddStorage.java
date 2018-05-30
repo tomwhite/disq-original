@@ -165,7 +165,7 @@ public class HtsjdkReadsRddStorage {
         abstractSamSource = new BamSource(useNio);
         break;
       case CRAM:
-        abstractSamSource = new CramSource();
+        abstractSamSource = new CramSource(useNio);
         break;
       case SAM:
         abstractSamSource = new SamSource();

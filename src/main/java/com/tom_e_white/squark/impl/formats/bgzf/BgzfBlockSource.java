@@ -27,10 +27,6 @@ public class BgzfBlockSource implements Serializable {
   private final PathSplitSource pathSplitSource;
   private final FileSystemWrapper fileSystemWrapper;
 
-  public BgzfBlockSource() {
-    this(false);
-  }
-
   /**
    * @param useNio if true use the NIO filesystem APIs rather than the Hadoop filesystem APIs. This
    *     is appropriate for cloud stores where file locality is not relied upon.
@@ -46,7 +42,8 @@ public class BgzfBlockSource implements Serializable {
     final Configuration conf = jsc.hadoopConfiguration();
     SerializableHadoopConfiguration confSer = new SerializableHadoopConfiguration(conf);
 
-    return pathSplitSource.getPathSplits(jsc, path, splitSize)
+    return pathSplitSource
+        .getPathSplits(jsc, path, splitSize)
         .flatMap((FlatMapFunction<PathSplit, BgzfBlock>) pathSplit -> {
           BgzfBlockGuesser bgzfBlockGuesser =
               getBgzfSplitGuesser(confSer.getConf(), pathSplit.getPath());

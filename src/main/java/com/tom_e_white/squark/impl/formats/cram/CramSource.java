@@ -2,13 +2,11 @@ package com.tom_e_white.squark.impl.formats.cram;
 
 import com.google.common.collect.Iterators;
 import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
-import com.tom_e_white.squark.impl.file.FileSplitInputFormat;
-import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
-import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
-import com.tom_e_white.squark.impl.file.PathChunk;
+import com.tom_e_white.squark.impl.file.*;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
+import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockSource;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import com.tom_e_white.squark.impl.formats.sam.SamFormat;
@@ -48,8 +46,11 @@ import scala.Tuple2;
 
 public class CramSource extends AbstractSamSource implements Serializable {
 
-  public CramSource() {
-    super(new HadoopFileSystemWrapper());
+  private final PathSplitSource pathSplitSource;
+
+  public CramSource(boolean useNio) {
+    super(useNio ? new NioFileSystemWrapper() : new HadoopFileSystemWrapper());
+    this.pathSplitSource = new PathSplitSource(useNio);
   }
 
   @Override
@@ -72,12 +73,7 @@ public class CramSource extends AbstractSamSource implements Serializable {
       throw new IllegalArgumentException("Traversing mapped reads only is not supported.");
     }
 
-    // Use Hadoop FileSystem API to maintain file locality by using Hadoop's FileInputFormat
-
     final Configuration conf = jsc.hadoopConfiguration();
-    if (splitSize > 0) {
-      conf.setInt(FileInputFormat.SPLIT_MAXSIZE, splitSize);
-    }
 
     // store paths (not full URIs) to avoid differences in scheme - this could be improved
     Map<String, List<Long>> pathToContainerOffsets = new LinkedHashMap<>();
@@ -106,19 +102,17 @@ public class CramSource extends AbstractSamSource implements Serializable {
     SerializableHadoopConfiguration confSer = new SerializableHadoopConfiguration(conf);
     Broadcast<HtsjdkReadsTraversalParameters<T>> traversalParametersBroadcast =
         traversalParameters == null ? null : jsc.broadcast(traversalParameters);
-    return jsc.newAPIHadoopFile(path, FileSplitInputFormat.class, Void.class, FileSplit.class, conf)
-        .flatMap(
-            (FlatMapFunction<Tuple2<Void, FileSplit>, SAMRecord>)
-                t2 -> {
+
+    return pathSplitSource
+        .getPathSplits(jsc, path, splitSize).flatMap(
+            (FlatMapFunction<PathSplit, SAMRecord>) pathSplit -> {
                   Configuration c = confSer.getConf();
-                  FileSplit fileSplit = t2._2();
-                  String p = fileSplit.getPath().toUri().toString();
+                  String p = pathSplit.getPath();
                   Map<String, List<Long>> pathToOffsets = containerOffsetsBroadcast.getValue();
                   String normPath = URI.create(fileSystemWrapper.normalize(c, p)).getPath();
                   List<Long> offsets = pathToOffsets.get(normPath);
-                  long newStart = nextContainerOffset(offsets, fileSplit.getStart());
-                  long newEnd =
-                      nextContainerOffset(offsets, fileSplit.getStart() + fileSplit.getLength());
+                  long newStart = nextContainerOffset(offsets, pathSplit.getStart());
+                  long newEnd = nextContainerOffset(offsets, pathSplit.getEnd());
                   if (newStart == newEnd) {
                     return Collections.emptyIterator();
                   }
