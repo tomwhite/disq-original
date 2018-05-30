@@ -178,7 +178,8 @@ public class CramSource extends AbstractSamSource implements Serializable {
       }
     } else {
       long cramFileLength = fileSystemWrapper.getFileLength(conf, path);
-      NavigableSet<Long> containerOffsets = getContainerOffsetsFromIndex(conf, path, cramFileLength);
+      NavigableSet<Long> containerOffsets =
+          getContainerOffsetsFromIndex(conf, path, cramFileLength);
       String normPath = URI.create(fileSystemWrapper.normalize(conf, path)).getPath();
       pathToContainerOffsets.put(normPath, containerOffsets);
     }
@@ -195,7 +196,8 @@ public class CramSource extends AbstractSamSource implements Serializable {
                 pathSplit -> {
                   Configuration c = confSer.getConf();
                   String p = pathSplit.getPath();
-                  Map<String, NavigableSet<Long>> pathToOffsets = containerOffsetsBroadcast.getValue();
+                  Map<String, NavigableSet<Long>> pathToOffsets =
+                      containerOffsetsBroadcast.getValue();
                   String normPath = URI.create(fileSystemWrapper.normalize(c, p)).getPath();
                   NavigableSet<Long> offsets = pathToOffsets.get(normPath);
                   long newStart = offsets.ceiling(pathSplit.getStart());

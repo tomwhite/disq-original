@@ -6,6 +6,7 @@ import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.PathChunk;
+import com.tom_e_white.squark.impl.file.PathSplitSource;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
@@ -14,18 +15,8 @@ import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockSource;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import com.tom_e_white.squark.impl.formats.sam.SamFormat;
-import htsjdk.samtools.AbstractBAMFileIndex;
-import htsjdk.samtools.BAMFileReader;
-import htsjdk.samtools.BAMFileSpan;
-import htsjdk.samtools.BAMIndex;
-import htsjdk.samtools.Chunk;
-import htsjdk.samtools.ExtSeekableBufferedStream;
-import htsjdk.samtools.QueryInterval;
-import htsjdk.samtools.SAMFileHeader;
-import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SamReader;
+import htsjdk.samtools.*;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
-import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
@@ -49,6 +40,7 @@ public class BamSource extends AbstractSamSource implements Serializable {
   private static final int MAX_READ_SIZE = 10_000_000;
 
   private final BgzfBlockSource bgzfBlockSource;
+  private final PathSplitSource pathSplitSource;
 
   /**
    * @param useNio if true use the NIO filesystem APIs rather than the Hadoop filesystem APIs. This
@@ -57,6 +49,7 @@ public class BamSource extends AbstractSamSource implements Serializable {
   public BamSource(boolean useNio) {
     super(useNio ? new NioFileSystemWrapper() : new HadoopFileSystemWrapper());
     this.bgzfBlockSource = new BgzfBlockSource(useNio);
+    this.pathSplitSource = new PathSplitSource(useNio);
   }
 
   @Override
@@ -174,6 +167,28 @@ public class BamSource extends AbstractSamSource implements Serializable {
       ValidationStringency stringency,
       String referenceSourcePath)
       throws IOException {
+
+    // TODO: handle directory of bai files
+    String splittingBaiPath = path + SplittingBAMIndex.FILE_EXTENSION;
+    if (fileSystemWrapper.exists(jsc.hadoopConfiguration(), splittingBaiPath)) {
+      SplittingBAMIndex splittingBAMIndex =
+          SplittingBAMIndex.load(
+              fileSystemWrapper.open(jsc.hadoopConfiguration(), splittingBaiPath));
+      Broadcast<SplittingBAMIndex> splittingBAMIndexBroadcast = jsc.broadcast(splittingBAMIndex);
+      pathSplitSource
+          .getPathSplits(jsc, path, splitSize)
+          .flatMap(
+              pathSplit -> {
+                SplittingBAMIndex index = splittingBAMIndexBroadcast.getValue();
+                Chunk chunk = index.getChunk(pathSplit.getStart(), pathSplit.getEnd());
+                if (chunk == null) {
+                  return Collections.emptyIterator();
+                } else {
+                  return Collections.singleton(new PathChunk(path, chunk)).iterator();
+                }
+              });
+    }
+
     SerializableHadoopConfiguration confSer =
         new SerializableHadoopConfiguration(jsc.hadoopConfiguration());
     return bgzfBlockSource

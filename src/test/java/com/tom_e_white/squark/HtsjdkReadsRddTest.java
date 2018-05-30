@@ -71,6 +71,29 @@ public class HtsjdkReadsRddTest extends BaseTest {
     Assert.assertEquals(expectedCount, htsjdkReadsRddStorage.read(outputPath).getReads().count());
   }
 
+  private Object[] parametersForTestReadUsingSplittingBai() {
+    return new Object[][] {
+      {"1-with-splitting-index.bam", 128 * 1024, false},
+      {"1-with-splitting-index.bam", 128 * 1024, true},
+    };
+  }
+
+  @Test
+  @Parameters
+  public void testReadUsingSplittingBai(String inputFile, int splitSize, boolean useNio)
+      throws Exception {
+    String inputPath = getPath(inputFile);
+
+    HtsjdkReadsRddStorage htsjdkReadsRddStorage =
+        HtsjdkReadsRddStorage.makeDefault(jsc).splitSize(splitSize).useNio(useNio);
+
+    HtsjdkReadsRdd htsjdkReadsRdd = htsjdkReadsRddStorage.read(inputPath);
+
+    // read the file using htsjdk to get expected number of reads, then count the number in the RDD
+    int expectedCount = countReads(inputPath);
+    Assert.assertEquals(expectedCount, htsjdkReadsRdd.getReads().count());
+  }
+
   private Object[] parametersForTestReadAndWriteMultiple() {
     return new Object[][] {
       {null, false, FormatWriteOption.BAM},
