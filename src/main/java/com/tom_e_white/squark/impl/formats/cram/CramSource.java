@@ -5,6 +5,7 @@ import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.FileSplitInputFormat;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
+import com.tom_e_white.squark.impl.file.ReadRange;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
@@ -22,7 +23,6 @@ import htsjdk.samtools.CramContainerHeaderIterator;
 import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
 import htsjdk.samtools.ValidationStringency;
@@ -127,28 +127,36 @@ public class CramSource extends AbstractSamSource implements Serializable {
                   CRAMFileReader cramFileReader = createCramFileReader(samReader);
                   // TODO: test edge cases
                   // Subtract one from end since CRAMIterator's boundaries are inclusive
-                  Chunk readRange =
-                      new Chunk(
-                          BgzfVirtualFilePointerUtil.makeFilePointer(newStart),
-                          BgzfVirtualFilePointerUtil.makeFilePointer(newEnd - 1));
-                  BAMFileSpan splitSpan = new BAMFileSpan(readRange);
+                  ReadRange readRange =
+                      new ReadRange(
+                          p,
+                          new Chunk(
+                              BgzfVirtualFilePointerUtil.makeFilePointer(newStart),
+                              BgzfVirtualFilePointerUtil.makeFilePointer(newEnd - 1)));
+                  BAMFileSpan splitSpan = new BAMFileSpan(readRange.getSpan());
                   HtsjdkReadsTraversalParameters<T> traversal =
                       traversalParametersBroadcast == null
                           ? null
                           : traversalParametersBroadcast.getValue();
-                  if (traversal != null) {
-                    SAMFileHeader header = samReader.getFileHeader();
-                    SAMSequenceDictionary dict = header.getSequenceDictionary();
+                  if (traversal == null) {
+                    // no intervals or unplaced, unmapped reads
+                    return new AutocloseIteratorWrapper<>(
+                        cramFileReader.getIterator(splitSpan), samReader);
+                  } else {
+                    if (!samReader.hasIndex()) {
+                      throw new IllegalArgumentException(
+                          "Intervals set but no CRAM index file found for " + p);
+                    }
                     BAMIndex idx = samReader.indexing().getIndex();
                     Iterator<SAMRecord> intervalReadsIterator;
                     if (traversal.getIntervalsForTraversal() == null
                         || traversal.getIntervalsForTraversal().isEmpty()) {
                       intervalReadsIterator = Collections.emptyIterator();
-                      samReader.close(); // not needed
                     } else {
+                      SAMFileHeader header = samReader.getFileHeader();
                       QueryInterval[] queryIntervals =
                           BoundedTraversalUtil.prepareQueryIntervals(
-                              traversal.getIntervalsForTraversal(), dict);
+                              traversal.getIntervalsForTraversal(), header.getSequenceDictionary());
                       BAMFileSpan span = BAMFileReader.getFileSpan(queryIntervals, idx);
                       span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
                       span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
@@ -167,7 +175,6 @@ public class CramSource extends AbstractSamSource implements Serializable {
                                   validationStringency,
                                   span.toCoordinateArray()),
                               ss);
-                      samReader.close(); // not needed
                     }
 
                     // add on unplaced unmapped reads if there are any in this range
@@ -176,24 +183,24 @@ public class CramSource extends AbstractSamSource implements Serializable {
                       // noCoordinateCount always seems to be 0, so ignore
                       if (startOfLastLinearBin != -1) {
                         long unplacedUnmappedStart = startOfLastLinearBin;
-                        if (readRange.getChunkStart() <= unplacedUnmappedStart
-                            && unplacedUnmappedStart < readRange.getChunkEnd()) { // TODO correct?
+                        if (readRange.getSpan().getChunkStart() <= unplacedUnmappedStart
+                            && unplacedUnmappedStart
+                                < readRange.getSpan().getChunkEnd()) { // TODO correct?
                           SamReader unplacedUnmappedReadsSamReader =
                               createSamReader(c, p, validationStringency, referenceSourcePath);
                           Iterator<SAMRecord> unplacedUnmappedReadsIterator =
                               new AutocloseIteratorWrapper<>(
-                                  createCramFileReader(unplacedUnmappedReadsSamReader)
-                                      .queryUnmapped(),
+                                  unplacedUnmappedReadsSamReader.queryUnmapped(),
                                   unplacedUnmappedReadsSamReader);
                           return Iterators.concat(
                               intervalReadsIterator, unplacedUnmappedReadsIterator);
                         }
                       }
+                      if (traversal.getIntervalsForTraversal() == null) {
+                        samReader.close(); // not used any more
+                      }
                     }
                     return intervalReadsIterator;
-                  } else {
-                    return new AutocloseIteratorWrapper<>(
-                        cramFileReader.getIterator(splitSpan), samReader);
                   }
                 });
   }

@@ -5,6 +5,7 @@ import com.tom_e_white.squark.HtsjdkReadsRdd;
 import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
+import com.tom_e_white.squark.impl.file.ReadRange;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
@@ -132,7 +133,7 @@ public class BamSource extends AbstractSamSource implements Serializable {
       String path,
       int splitSize,
       HtsjdkReadsTraversalParameters<T> traversalParameters,
-      ValidationStringency stringency,
+      ValidationStringency validationStringency,
       String referenceSourcePath)
       throws IOException {
     if (traversalParameters != null
@@ -151,15 +152,16 @@ public class BamSource extends AbstractSamSource implements Serializable {
         .mapPartitions(
             (FlatMapFunction<Iterator<BgzfBlock>, SAMRecord>)
                 bgzfBlocks -> {
-                  Configuration conf = confSer.getConf();
+                  Configuration c = confSer.getConf();
                   ReadRange readRange =
-                      getFirstReadInPartition(conf, bgzfBlocks, stringency, referenceSourcePath);
+                      getFirstReadInPartition(
+                          c, bgzfBlocks, validationStringency, referenceSourcePath);
                   if (readRange == null) {
                     return Collections.emptyIterator();
                   }
                   String p = readRange.getPath();
-                  SamReader samReader = createSamReader(conf, p, stringency, referenceSourcePath);
-                  SAMFileHeader header = samReader.getFileHeader();
+                  SamReader samReader =
+                      createSamReader(c, p, validationStringency, referenceSourcePath);
                   BAMFileReader bamFileReader = createBamFileReader(samReader);
                   BAMFileSpan splitSpan = new BAMFileSpan(readRange.getSpan());
                   HtsjdkReadsTraversalParameters<T> traversal =
@@ -181,6 +183,7 @@ public class BamSource extends AbstractSamSource implements Serializable {
                         || traversal.getIntervalsForTraversal().isEmpty()) {
                       intervalReadsIterator = Collections.emptyIterator();
                     } else {
+                      SAMFileHeader header = samReader.getFileHeader();
                       QueryInterval[] queryIntervals =
                           BoundedTraversalUtil.prepareQueryIntervals(
                               traversal.getIntervalsForTraversal(), header.getSequenceDictionary());
@@ -204,11 +207,10 @@ public class BamSource extends AbstractSamSource implements Serializable {
                             && unplacedUnmappedStart
                                 < readRange.getSpan().getChunkEnd()) { // TODO correct?
                           SamReader unplacedUnmappedReadsSamReader =
-                              createSamReader(conf, p, stringency, referenceSourcePath);
+                              createSamReader(c, p, validationStringency, referenceSourcePath);
                           Iterator<SAMRecord> unplacedUnmappedReadsIterator =
                               new AutocloseIteratorWrapper<>(
-                                  createBamFileReader(unplacedUnmappedReadsSamReader)
-                                      .queryUnmapped(),
+                                  unplacedUnmappedReadsSamReader.queryUnmapped(),
                                   unplacedUnmappedReadsSamReader);
                           return Iterators.concat(
                               intervalReadsIterator, unplacedUnmappedReadsIterator);
@@ -232,27 +234,5 @@ public class BamSource extends AbstractSamSource implements Serializable {
       // closed by the close() method
     }
     return bamFileReader;
-  }
-
-  /**
-   * Stores the virtual span of a partition, from the start of the first read, to the end of the
-   * partition.
-   */
-  static class ReadRange implements Serializable {
-    private final String path;
-    private final Chunk span;
-
-    public ReadRange(String path, Chunk span) {
-      this.path = path;
-      this.span = span;
-    }
-
-    public String getPath() {
-      return path;
-    }
-
-    public Chunk getSpan() {
-      return span;
-    }
   }
 }
