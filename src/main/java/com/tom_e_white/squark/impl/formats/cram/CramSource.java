@@ -162,7 +162,7 @@ public class CramSource extends AbstractSamSource implements Serializable {
     final Configuration conf = jsc.hadoopConfiguration();
 
     // store paths (not full URIs) to avoid differences in scheme - this could be improved
-    Map<String, List<Long>> pathToContainerOffsets = new LinkedHashMap<>();
+    Map<String, NavigableSet<Long>> pathToContainerOffsets = new LinkedHashMap<>();
     if (fileSystemWrapper.isDirectory(conf, path)) {
       List<String> paths =
           fileSystemWrapper
@@ -172,17 +172,17 @@ public class CramSource extends AbstractSamSource implements Serializable {
               .collect(Collectors.toList());
       for (String p : paths) {
         long cramFileLength = fileSystemWrapper.getFileLength(conf, p);
-        List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, p, cramFileLength);
+        NavigableSet<Long> containerOffsets = getContainerOffsetsFromIndex(conf, p, cramFileLength);
         String normPath = URI.create(fileSystemWrapper.normalize(conf, p)).getPath();
         pathToContainerOffsets.put(normPath, containerOffsets);
       }
     } else {
       long cramFileLength = fileSystemWrapper.getFileLength(conf, path);
-      List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, path, cramFileLength);
+      NavigableSet<Long> containerOffsets = getContainerOffsetsFromIndex(conf, path, cramFileLength);
       String normPath = URI.create(fileSystemWrapper.normalize(conf, path)).getPath();
       pathToContainerOffsets.put(normPath, containerOffsets);
     }
-    Broadcast<Map<String, List<Long>>> containerOffsetsBroadcast =
+    Broadcast<Map<String, NavigableSet<Long>>> containerOffsetsBroadcast =
         jsc.broadcast(pathToContainerOffsets);
 
     SerializableHadoopConfiguration confSer =
@@ -195,11 +195,11 @@ public class CramSource extends AbstractSamSource implements Serializable {
                 pathSplit -> {
                   Configuration c = confSer.getConf();
                   String p = pathSplit.getPath();
-                  Map<String, List<Long>> pathToOffsets = containerOffsetsBroadcast.getValue();
+                  Map<String, NavigableSet<Long>> pathToOffsets = containerOffsetsBroadcast.getValue();
                   String normPath = URI.create(fileSystemWrapper.normalize(c, p)).getPath();
-                  List<Long> offsets = pathToOffsets.get(normPath);
-                  long newStart = nextContainerOffset(offsets, pathSplit.getStart());
-                  long newEnd = nextContainerOffset(offsets, pathSplit.getEnd());
+                  NavigableSet<Long> offsets = pathToOffsets.get(normPath);
+                  long newStart = offsets.ceiling(pathSplit.getStart());
+                  long newEnd = offsets.ceiling(pathSplit.getEnd());
                   if (newStart == newEnd) {
                     return Collections.emptyIterator();
                   }
@@ -215,13 +215,13 @@ public class CramSource extends AbstractSamSource implements Serializable {
                 });
   }
 
-  private List<Long> getContainerOffsetsFromIndex(
+  private NavigableSet<Long> getContainerOffsetsFromIndex(
       Configuration conf, String path, long cramFileLength) throws IOException {
     try (SeekableStream in = findIndex(conf, path)) {
       if (in == null) {
         return getContainerOffsetsFromFile(conf, path, cramFileLength);
       }
-      List<Long> containerOffsets = new ArrayList<>();
+      NavigableSet<Long> containerOffsets = new TreeSet<>();
       CRAIIndex index = CRAMCRAIIndexer.readIndex(in);
       for (CRAIEntry entry : index.getCRAIEntries()) {
         containerOffsets.add(entry.containerStartOffset);
@@ -231,11 +231,11 @@ public class CramSource extends AbstractSamSource implements Serializable {
     }
   }
 
-  private List<Long> getContainerOffsetsFromFile(
+  private NavigableSet<Long> getContainerOffsetsFromFile(
       Configuration conf, String path, long cramFileLength) throws IOException {
     try (SeekableStream seekableStream = fileSystemWrapper.open(conf, path)) {
       CramContainerHeaderIterator it = new CramContainerHeaderIterator(seekableStream);
-      List<Long> containerOffsets = new ArrayList<Long>();
+      NavigableSet<Long> containerOffsets = new TreeSet<>();
       while (it.hasNext()) {
         Container container = it.next();
         containerOffsets.add(container.offset);
@@ -243,26 +243,6 @@ public class CramSource extends AbstractSamSource implements Serializable {
       containerOffsets.add(cramFileLength);
       return containerOffsets;
     }
-  }
-
-  private static long nextContainerOffset(List<Long> containerOffsets, long position) {
-    int index = Collections.binarySearch(containerOffsets, position);
-    long offset;
-    if (index >= 0) {
-      offset = containerOffsets.get(index);
-    } else {
-      int insertionPoint = -index - 1;
-      if (insertionPoint == containerOffsets.size()) {
-        throw new IllegalStateException(
-            "Could not find position "
-                + position
-                + " in "
-                + "container offsets: "
-                + containerOffsets);
-      }
-      offset = containerOffsets.get(insertionPoint);
-    }
-    return offset;
   }
 
   private CRAMFileReader createCramFileReader(SamReader samReader) throws IOException {
