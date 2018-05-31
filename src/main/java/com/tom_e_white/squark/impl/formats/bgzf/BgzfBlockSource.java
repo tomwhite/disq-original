@@ -5,15 +5,14 @@ import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
 import com.tom_e_white.squark.impl.formats.bam.BamSource;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockGuesser.BgzfBlock;
 import htsjdk.samtools.util.AbstractIterator;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.Iterator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
-
-import java.io.IOException;
-import java.io.Serializable;
-import java.util.Iterator;
 
 /**
  * This class can find BGZF block boundaries in a distributed manner, and then iterate over all the
@@ -44,11 +43,13 @@ public class BgzfBlockSource implements Serializable {
 
     return pathSplitSource
         .getPathSplits(jsc, path, splitSize)
-        .flatMap((FlatMapFunction<PathSplit, BgzfBlock>) pathSplit -> {
-          BgzfBlockGuesser bgzfBlockGuesser =
-              getBgzfSplitGuesser(confSer.getConf(), pathSplit.getPath());
-          return getBgzfBlockIterator(bgzfBlockGuesser, pathSplit);
-        });
+        .flatMap(
+            (FlatMapFunction<PathSplit, BgzfBlock>)
+                pathSplit -> {
+                  BgzfBlockGuesser bgzfBlockGuesser =
+                      getBgzfSplitGuesser(confSer.getConf(), pathSplit.getPath());
+                  return getBgzfBlockIterator(bgzfBlockGuesser, pathSplit);
+                });
     // TODO: drop final empty block
   }
 
@@ -61,8 +62,7 @@ public class BgzfBlockSource implements Serializable {
    */
   private static Iterator<BgzfBlock> getBgzfBlockIterator(
       BgzfBlockGuesser bgzfBlockGuesser, PathSplit split) {
-    return getBgzfBlockIterator(
-        bgzfBlockGuesser, split.getStart(), split.getEnd());
+    return getBgzfBlockIterator(bgzfBlockGuesser, split.getStart(), split.getEnd());
   }
 
   private static Iterator<BgzfBlock> getBgzfBlockIterator(

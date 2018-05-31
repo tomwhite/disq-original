@@ -65,61 +65,6 @@ public class BamSource extends AbstractSamSource implements Serializable {
   }
 
   /**
-   * @return the {@link PathChunk} for the partition, or null if there is none (e.g. in the case of
-   *     long reads, and/or very small partitions).
-   */
-  private <T extends Locatable> PathChunk getFirstReadInPartition(
-      Configuration conf,
-      Iterator<BgzfBlock> bgzfBlocks,
-      ValidationStringency stringency,
-      String referenceSourcePath)
-      throws IOException {
-    PathChunk pathChunk = null;
-    BamRecordGuesser bamRecordGuesser = null;
-    try {
-      String partitionPath = null;
-      int index = 0; // limit search to MAX_READ_SIZE positions
-      while (bgzfBlocks.hasNext()) {
-        BgzfBlock block = bgzfBlocks.next();
-        if (partitionPath == null) { // assume each partition comes from only a single file path
-          partitionPath = block.path;
-          try (SamReader samReader =
-              createSamReader(conf, partitionPath, stringency, referenceSourcePath)) {
-            SAMFileHeader header = samReader.getFileHeader();
-            bamRecordGuesser = getBamRecordGuesser(conf, partitionPath, header);
-          }
-        }
-        for (int up = 0; up < block.uSize; up++) {
-          index++;
-          if (index > MAX_READ_SIZE) {
-            return null;
-          }
-          long vPos = BgzfVirtualFilePointerUtil.makeFilePointer(block.pos, up);
-          // As the guesser goes to the next BGZF block before looking for BAM
-          // records, the ending BGZF blocks have to always be traversed fully.
-          // Hence force the length to be 0xffff, the maximum possible.
-          long vEnd = BgzfVirtualFilePointerUtil.makeFilePointer(block.end, 0xffff);
-          if (bamRecordGuesser.checkRecordStart(vPos)) {
-            block.end();
-            return new PathChunk(partitionPath, new Chunk(vPos, vEnd));
-          }
-        }
-      }
-    } finally {
-      if (bamRecordGuesser != null) {
-        bamRecordGuesser.close();
-      }
-    }
-    return pathChunk;
-  }
-
-  private BamRecordGuesser getBamRecordGuesser(
-      Configuration conf, String path, SAMFileHeader header) throws IOException {
-    SeekableStream ss = new ExtSeekableBufferedStream(fileSystemWrapper.open(conf, path));
-    return new BamRecordGuesser(ss, header.getSequenceDictionary().size(), header);
-  }
-
-  /**
    * @return an RDD of reads for a bounded traversal (intervals and whether to return unplaced,
    *     unmapped reads).
    */
@@ -143,17 +88,18 @@ public class BamSource extends AbstractSamSource implements Serializable {
     SerializableHadoopConfiguration confSer =
         new SerializableHadoopConfiguration(jsc.hadoopConfiguration());
 
-    return bgzfBlockSource
-        .getBgzfBlocks(jsc, path, splitSize)
+    return getPathChunks(jsc, path, splitSize, validationStringency, referenceSourcePath)
         .mapPartitions(
-            (FlatMapFunction<Iterator<BgzfBlock>, SAMRecord>)
-                bgzfBlocks -> {
+            (FlatMapFunction<Iterator<PathChunk>, SAMRecord>)
+                pathChunks -> {
                   Configuration c = confSer.getConf();
-                  PathChunk pathChunk =
-                      getFirstReadInPartition(
-                          c, bgzfBlocks, validationStringency, referenceSourcePath);
-                  if (pathChunk == null) {
+                  if (!pathChunks.hasNext()) {
                     return Collections.emptyIterator();
+                  }
+                  PathChunk pathChunk = pathChunks.next();
+                  if (pathChunks.hasNext()) {
+                    throw new IllegalArgumentException(
+                        "Should not have more than one path chunk per partition");
                   }
                   String p = pathChunk.getPath();
                   SamReader samReader =
@@ -219,6 +165,85 @@ public class BamSource extends AbstractSamSource implements Serializable {
                     return intervalReadsIterator;
                   }
                 });
+  }
+
+  private JavaRDD<PathChunk> getPathChunks(
+      JavaSparkContext jsc,
+      String path,
+      int splitSize,
+      ValidationStringency stringency,
+      String referenceSourcePath)
+      throws IOException {
+    SerializableHadoopConfiguration confSer =
+        new SerializableHadoopConfiguration(jsc.hadoopConfiguration());
+    return bgzfBlockSource
+        .getBgzfBlocks(jsc, path, splitSize)
+        .mapPartitions(
+            (FlatMapFunction<Iterator<BgzfBlock>, PathChunk>)
+                bgzfBlocks -> {
+                  Configuration conf = confSer.getConf();
+                  PathChunk pathChunk =
+                      getFirstReadInPartition(conf, bgzfBlocks, stringency, referenceSourcePath);
+                  if (pathChunk == null) {
+                    return Collections.emptyIterator();
+                  }
+                  return Collections.singleton(pathChunk).iterator();
+                });
+  }
+
+  /**
+   * @return the {@link PathChunk} for the partition, or null if there is none (e.g. in the case of
+   *     long reads, and/or very small partitions).
+   */
+  private <T extends Locatable> PathChunk getFirstReadInPartition(
+      Configuration conf,
+      Iterator<BgzfBlock> bgzfBlocks,
+      ValidationStringency stringency,
+      String referenceSourcePath)
+      throws IOException {
+    PathChunk pathChunk = null;
+    BamRecordGuesser bamRecordGuesser = null;
+    try {
+      String partitionPath = null;
+      int index = 0; // limit search to MAX_READ_SIZE positions
+      while (bgzfBlocks.hasNext()) {
+        BgzfBlock block = bgzfBlocks.next();
+        if (partitionPath == null) { // assume each partition comes from only a single file path
+          partitionPath = block.path;
+          try (SamReader samReader =
+              createSamReader(conf, partitionPath, stringency, referenceSourcePath)) {
+            SAMFileHeader header = samReader.getFileHeader();
+            bamRecordGuesser = getBamRecordGuesser(conf, partitionPath, header);
+          }
+        }
+        for (int up = 0; up < block.uSize; up++) {
+          index++;
+          if (index > MAX_READ_SIZE) {
+            return null;
+          }
+          long vPos = BgzfVirtualFilePointerUtil.makeFilePointer(block.pos, up);
+          // As the guesser goes to the next BGZF block before looking for BAM
+          // records, the ending BGZF blocks have to always be traversed fully.
+          // Hence force the length to be 0xffff, the maximum possible.
+          long vEnd = BgzfVirtualFilePointerUtil.makeFilePointer(block.end, 0xffff);
+          if (bamRecordGuesser.checkRecordStart(vPos)) {
+            block.end();
+            return new PathChunk(partitionPath, new Chunk(vPos, vEnd));
+          }
+        }
+      }
+    } finally {
+      if (bamRecordGuesser != null) {
+        bamRecordGuesser.close();
+      }
+    }
+    return pathChunk;
+  }
+
+  private BamRecordGuesser getBamRecordGuesser(
+      Configuration conf, String path, SAMFileHeader header) throws IOException {
+    SeekableStream ss = new ExtSeekableBufferedStream(fileSystemWrapper.open(conf, path));
+    return new BamRecordGuesser(ss, header.getSequenceDictionary().size(), header);
   }
 
   private BAMFileReader createBamFileReader(SamReader samReader) {

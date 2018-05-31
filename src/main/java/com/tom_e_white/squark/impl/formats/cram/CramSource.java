@@ -6,24 +6,11 @@ import com.tom_e_white.squark.impl.file.*;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
-import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockSource;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import com.tom_e_white.squark.impl.formats.sam.SamFormat;
-import htsjdk.samtools.BAMFileReader;
-import htsjdk.samtools.BAMFileSpan;
-import htsjdk.samtools.BAMIndex;
-import htsjdk.samtools.CRAMCRAIIndexer;
-import htsjdk.samtools.CRAMFileReader;
-import htsjdk.samtools.CRAMIntervalIterator;
-import htsjdk.samtools.Chunk;
-import htsjdk.samtools.CramContainerHeaderIterator;
-import htsjdk.samtools.QueryInterval;
-import htsjdk.samtools.SAMFileHeader;
-import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SamReader;
+import htsjdk.samtools.*;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
-import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.cram.CRAIEntry;
 import htsjdk.samtools.cram.CRAIIndex;
 import htsjdk.samtools.cram.ref.ReferenceSource;
@@ -36,13 +23,10 @@ import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.broadcast.Broadcast;
-import scala.Tuple2;
 
 public class CramSource extends AbstractSamSource implements Serializable {
 
@@ -73,60 +57,28 @@ public class CramSource extends AbstractSamSource implements Serializable {
       throw new IllegalArgumentException("Traversing mapped reads only is not supported.");
     }
 
-    final Configuration conf = jsc.hadoopConfiguration();
-
-    // store paths (not full URIs) to avoid differences in scheme - this could be improved
-    Map<String, List<Long>> pathToContainerOffsets = new LinkedHashMap<>();
-    if (fileSystemWrapper.isDirectory(conf, path)) {
-      List<String> paths =
-          fileSystemWrapper
-              .listDirectory(conf, path)
-              .stream()
-              .filter(SamFormat.CRAM::fileMatches)
-              .collect(Collectors.toList());
-      for (String p : paths) {
-        long cramFileLength = fileSystemWrapper.getFileLength(conf, p);
-        List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, p, cramFileLength);
-        String normPath = URI.create(fileSystemWrapper.normalize(conf, p)).getPath();
-        pathToContainerOffsets.put(normPath, containerOffsets);
-      }
-    } else {
-      long cramFileLength = fileSystemWrapper.getFileLength(conf, path);
-      List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, path, cramFileLength);
-      String normPath = URI.create(fileSystemWrapper.normalize(conf, path)).getPath();
-      pathToContainerOffsets.put(normPath, containerOffsets);
-    }
-    Broadcast<Map<String, List<Long>>> containerOffsetsBroadcast =
-        jsc.broadcast(pathToContainerOffsets);
-
-    SerializableHadoopConfiguration confSer = new SerializableHadoopConfiguration(conf);
     Broadcast<HtsjdkReadsTraversalParameters<T>> traversalParametersBroadcast =
         traversalParameters == null ? null : jsc.broadcast(traversalParameters);
+    SerializableHadoopConfiguration confSer =
+        new SerializableHadoopConfiguration(jsc.hadoopConfiguration());
 
-    return pathSplitSource
-        .getPathSplits(jsc, path, splitSize).flatMap(
-            (FlatMapFunction<PathSplit, SAMRecord>) pathSplit -> {
+    return getPathChunks(jsc, path, splitSize, validationStringency, referenceSourcePath)
+        .mapPartitions(
+            (FlatMapFunction<Iterator<PathChunk>, SAMRecord>)
+                pathChunks -> {
                   Configuration c = confSer.getConf();
-                  String p = pathSplit.getPath();
-                  Map<String, List<Long>> pathToOffsets = containerOffsetsBroadcast.getValue();
-                  String normPath = URI.create(fileSystemWrapper.normalize(c, p)).getPath();
-                  List<Long> offsets = pathToOffsets.get(normPath);
-                  long newStart = nextContainerOffset(offsets, pathSplit.getStart());
-                  long newEnd = nextContainerOffset(offsets, pathSplit.getEnd());
-                  if (newStart == newEnd) {
+                  if (!pathChunks.hasNext()) {
                     return Collections.emptyIterator();
                   }
+                  PathChunk pathChunk = pathChunks.next();
+                  if (pathChunks.hasNext()) {
+                    throw new IllegalArgumentException(
+                        "Should not have more than one path chunk per partition");
+                  }
+                  String p = pathChunk.getPath();
                   SamReader samReader =
                       createSamReader(c, p, validationStringency, referenceSourcePath);
                   CRAMFileReader cramFileReader = createCramFileReader(samReader);
-                  // TODO: test edge cases
-                  // Subtract one from end since CRAMIterator's boundaries are inclusive
-                  PathChunk pathChunk =
-                      new PathChunk(
-                          p,
-                          new Chunk(
-                              BgzfVirtualFilePointerUtil.makeFilePointer(newStart),
-                              BgzfVirtualFilePointerUtil.makeFilePointer(newEnd - 1)));
                   BAMFileSpan splitSpan = new BAMFileSpan(pathChunk.getSpan());
                   HtsjdkReadsTraversalParameters<T> traversal =
                       traversalParametersBroadcast == null
@@ -196,6 +148,70 @@ public class CramSource extends AbstractSamSource implements Serializable {
                     }
                     return intervalReadsIterator;
                   }
+                });
+  }
+
+  private JavaRDD<PathChunk> getPathChunks(
+      JavaSparkContext jsc,
+      String path,
+      int splitSize,
+      ValidationStringency stringency,
+      String referenceSourcePath)
+      throws IOException {
+
+    final Configuration conf = jsc.hadoopConfiguration();
+
+    // store paths (not full URIs) to avoid differences in scheme - this could be improved
+    Map<String, List<Long>> pathToContainerOffsets = new LinkedHashMap<>();
+    if (fileSystemWrapper.isDirectory(conf, path)) {
+      List<String> paths =
+          fileSystemWrapper
+              .listDirectory(conf, path)
+              .stream()
+              .filter(SamFormat.CRAM::fileMatches)
+              .collect(Collectors.toList());
+      for (String p : paths) {
+        long cramFileLength = fileSystemWrapper.getFileLength(conf, p);
+        List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, p, cramFileLength);
+        String normPath = URI.create(fileSystemWrapper.normalize(conf, p)).getPath();
+        pathToContainerOffsets.put(normPath, containerOffsets);
+      }
+    } else {
+      long cramFileLength = fileSystemWrapper.getFileLength(conf, path);
+      List<Long> containerOffsets = getContainerOffsetsFromIndex(conf, path, cramFileLength);
+      String normPath = URI.create(fileSystemWrapper.normalize(conf, path)).getPath();
+      pathToContainerOffsets.put(normPath, containerOffsets);
+    }
+    Broadcast<Map<String, List<Long>>> containerOffsetsBroadcast =
+        jsc.broadcast(pathToContainerOffsets);
+
+    SerializableHadoopConfiguration confSer =
+        new SerializableHadoopConfiguration(jsc.hadoopConfiguration());
+
+    return pathSplitSource
+        .getPathSplits(jsc, path, splitSize)
+        .flatMap(
+            (FlatMapFunction<PathSplit, PathChunk>)
+                pathSplit -> {
+                  Configuration c = confSer.getConf();
+                  String p = pathSplit.getPath();
+                  Map<String, List<Long>> pathToOffsets = containerOffsetsBroadcast.getValue();
+                  String normPath = URI.create(fileSystemWrapper.normalize(c, p)).getPath();
+                  List<Long> offsets = pathToOffsets.get(normPath);
+                  long newStart = nextContainerOffset(offsets, pathSplit.getStart());
+                  long newEnd = nextContainerOffset(offsets, pathSplit.getEnd());
+                  if (newStart == newEnd) {
+                    return Collections.emptyIterator();
+                  }
+                  // TODO: test edge cases
+                  // Subtract one from end since CRAMIterator's boundaries are inclusive
+                  PathChunk pathChunk =
+                      new PathChunk(
+                          p,
+                          new Chunk(
+                              BgzfVirtualFilePointerUtil.makeFilePointer(newStart),
+                              BgzfVirtualFilePointerUtil.makeFilePointer(newEnd - 1)));
+                  return Collections.singleton(pathChunk).iterator();
                 });
   }
 
