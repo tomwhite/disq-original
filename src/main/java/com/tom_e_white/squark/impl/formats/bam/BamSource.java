@@ -1,24 +1,29 @@
 package com.tom_e_white.squark.impl.formats.bam;
 
-import com.google.common.collect.Iterators;
 import com.tom_e_white.squark.HtsjdkReadsRdd;
-import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import com.tom_e_white.squark.impl.file.PathChunk;
 import com.tom_e_white.squark.impl.file.PathSplitSource;
-import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
-import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockGuesser.BgzfBlock;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockSource;
-import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
+import com.tom_e_white.squark.impl.formats.sam.AbstractBinarySamSource;
 import com.tom_e_white.squark.impl.formats.sam.SamFormat;
-import htsjdk.samtools.*;
+import htsjdk.samtools.BAMFileReader;
+import htsjdk.samtools.Chunk;
+import htsjdk.samtools.QueryInterval;
+import htsjdk.samtools.SAMFileHeader;
+import htsjdk.samtools.SAMFileSpan;
+import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
+import htsjdk.samtools.SplittingBAMIndex;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.seekablestream.SeekableBufferedStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
+import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.io.Serializable;
@@ -36,7 +41,7 @@ import org.apache.spark.broadcast.Broadcast;
  * @see BamSink
  * @see HtsjdkReadsRdd
  */
-public class BamSource extends AbstractSamSource implements Serializable {
+public class BamSource extends AbstractBinarySamSource implements Serializable {
 
   private static final int MAX_READ_SIZE = 10_000_000;
 
@@ -58,109 +63,8 @@ public class BamSource extends AbstractSamSource implements Serializable {
     return SamFormat.BAM;
   }
 
-  /**
-   * @return an RDD of reads for a bounded traversal (intervals and whether to return unplaced,
-   *     unmapped reads).
-   */
   @Override
-  public <T extends Locatable> JavaRDD<SAMRecord> getReads(
-      JavaSparkContext jsc,
-      String path,
-      int splitSize,
-      HtsjdkReadsTraversalParameters<T> traversalParameters,
-      ValidationStringency validationStringency,
-      String referenceSourcePath)
-      throws IOException {
-    if (traversalParameters != null
-        && traversalParameters.getIntervalsForTraversal() == null
-        && !traversalParameters.getTraverseUnplacedUnmapped()) {
-      throw new IllegalArgumentException("Traversing mapped reads only is not supported.");
-    }
-
-    Broadcast<HtsjdkReadsTraversalParameters<T>> traversalParametersBroadcast =
-        traversalParameters == null ? null : jsc.broadcast(traversalParameters);
-    SerializableHadoopConfiguration confSer =
-        new SerializableHadoopConfiguration(jsc.hadoopConfiguration());
-
-    return getPathChunks(jsc, path, splitSize, validationStringency, referenceSourcePath)
-        .mapPartitions(
-            (FlatMapFunction<Iterator<PathChunk>, SAMRecord>)
-                pathChunks -> {
-                  Configuration c = confSer.getConf();
-                  if (!pathChunks.hasNext()) {
-                    return Collections.emptyIterator();
-                  }
-                  PathChunk pathChunk = pathChunks.next();
-                  if (pathChunks.hasNext()) {
-                    throw new IllegalArgumentException(
-                        "Should not have more than one path chunk per partition");
-                  }
-                  String p = pathChunk.getPath();
-                  SamReader samReader =
-                      createSamReader(c, p, validationStringency, referenceSourcePath);
-                  BAMFileReader bamFileReader = createBamFileReader(samReader);
-                  BAMFileSpan splitSpan = new BAMFileSpan(pathChunk.getSpan());
-                  HtsjdkReadsTraversalParameters<T> traversal =
-                      traversalParametersBroadcast == null
-                          ? null
-                          : traversalParametersBroadcast.getValue();
-                  if (traversal == null) {
-                    // no intervals or unplaced, unmapped reads
-                    return new AutocloseIteratorWrapper<>(
-                        bamFileReader.getIterator(splitSpan), samReader);
-                  } else {
-                    if (!samReader.hasIndex()) {
-                      samReader.close();
-                      throw new IllegalArgumentException(
-                          "Intervals set but no BAM index file found for " + p);
-                    }
-                    BAMIndex idx = samReader.indexing().getIndex();
-                    long startOfLastLinearBin = idx.getStartOfLastLinearBin();
-                    long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
-                    Iterator<SAMRecord> intervalReadsIterator;
-                    if (traversal.getIntervalsForTraversal() == null
-                        || traversal.getIntervalsForTraversal().isEmpty()) {
-                      intervalReadsIterator = Collections.emptyIterator();
-                      samReader.close(); // not used from this point on
-                    } else {
-                      SAMFileHeader header = samReader.getFileHeader();
-                      QueryInterval[] queryIntervals =
-                          BoundedTraversalUtil.prepareQueryIntervals(
-                              traversal.getIntervalsForTraversal(), header.getSequenceDictionary());
-                      BAMFileSpan span = BAMFileReader.getFileSpan(queryIntervals, idx);
-                      span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
-                      span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
-                      intervalReadsIterator =
-                          new AutocloseIteratorWrapper<>(
-                              bamFileReader.createIndexIterator(
-                                  queryIntervals, false, span.toCoordinateArray()),
-                              samReader);
-                    }
-
-                    // add on unplaced unmapped reads if there are any in this range
-                    if (traversal.getTraverseUnplacedUnmapped()) {
-                      if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
-                        long unplacedUnmappedStart = startOfLastLinearBin;
-                        if (pathChunk.getSpan().getChunkStart() <= unplacedUnmappedStart
-                            && unplacedUnmappedStart
-                                < pathChunk.getSpan().getChunkEnd()) { // TODO correct?
-                          SamReader unplacedUnmappedReadsSamReader =
-                              createSamReader(c, p, validationStringency, referenceSourcePath);
-                          Iterator<SAMRecord> unplacedUnmappedReadsIterator =
-                              new AutocloseIteratorWrapper<>(
-                                  unplacedUnmappedReadsSamReader.queryUnmapped(),
-                                  unplacedUnmappedReadsSamReader);
-                          return Iterators.concat(
-                              intervalReadsIterator, unplacedUnmappedReadsIterator);
-                        }
-                      }
-                    }
-                    return intervalReadsIterator;
-                  }
-                });
-  }
-
-  private JavaRDD<PathChunk> getPathChunks(
+  protected JavaRDD<PathChunk> getPathChunks(
       JavaSparkContext jsc,
       String path,
       int splitSize,
@@ -262,7 +166,7 @@ public class BamSource extends AbstractSamSource implements Serializable {
     return new BamRecordGuesser(ss, header.getSequenceDictionary().size(), header);
   }
 
-  private BAMFileReader createBamFileReader(SamReader samReader) {
+  private BAMFileReader getUnderlyingBamFileReader(SamReader samReader) {
     BAMFileReader bamFileReader =
         (BAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
     if (bamFileReader.hasIndex()) {
@@ -271,5 +175,17 @@ public class BamSource extends AbstractSamSource implements Serializable {
       // closed by the close() method
     }
     return bamFileReader;
+  }
+
+  @Override
+  protected CloseableIterator<SAMRecord> getIterator(SamReader samReader, SAMFileSpan chunks) {
+    return getUnderlyingBamFileReader(samReader).getIterator(chunks);
+  }
+
+  @Override
+  protected CloseableIterator<SAMRecord> createIndexIterator(
+      SamReader samReader, QueryInterval[] intervals, boolean contained, long[] filePointers) {
+    return getUnderlyingBamFileReader(samReader)
+        .createIndexIterator(intervals, contained, filePointers);
   }
 }
