@@ -20,17 +20,18 @@ below for details on each feature.
 | Feature                         | BAM                           | CRAM                          | SAM                           | VCF                           |
 | ------------------------------- | ----------------------------- | ----------------------------- | ----------------------------- | ----------------------------- |
 | Filesystems - Hadoop (r/w)      | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
-| Filesystems - NIO (r)           | :white_check_mark:            | :x:                           | :x:                           | :x:                           |
+| Filesystems - NIO (r)           | :white_check_mark:            | :white_check_mark:            | :x:                           | :x:                           |
 | Filesystems - NIO (w)           | :x:                           | :x:                           | :x:                           | :x:                           |
 | Compression                     | NA                            | NA                            | NA                            | :white_check_mark:            |
 | Multiple input files            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Sharded output                  | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Indexes - read heuristic        | :white_check_mark:            | :white_check_mark:            | NA                            | NA                            |
 | Indexes - read .bai/.crai       | :x:                           | :white_check_mark:            | NA                            | NA                            |
-| Indexes - read .splitting-bai   | :x:                           | NA                            | NA                            | NA                            |
+| Indexes - read .sbi             | :white_check_mark:            | NA                            | NA                            | NA                            |
+| Indexes - write .sbi            | :x:                           | NA                            | NA                            | NA                            |
 | Intervals                       | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Ordering guarantees             | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
-| Partition guarantees            | :x:                           | NA                            | :x:                           | NA                            |
+| Queryname sorted guarantees     | :x:                           | NA                            | :x:                           | NA                            |
 | Stringency                      | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | NA                            |
 | Testing - large files           | :x:                           | :x:                           | :x:                           | :x:                           |
 | Testing - samtools and bcftools | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
@@ -108,12 +109,12 @@ Sharded files are treated as a single file for the purposes of reading multiple 
 ### Indexes
 
 For reading BAM, if there is no index, then the file is split using a heuristic algorithm to
-find record boundaries. Otherwise, if a `.splitting-bai` index file is found it is used to find
+find record boundaries. Otherwise, if a `.sbi` index file is found it is used to find
 splits. A regular `.bai` index file may optionally be used to find splits, although it does not
 protect against regions with very high coverage (oversampling) since it specifies genomic
 regions, not file regions.
 
-For writing BAM, it is possible to write `.splitting-bai` indexes at the same time as writing the
+For writing BAM, it is possible to write `.sbi` indexes at the same time as writing the
 BAM file.
 
 For reading CRAM, if there is a `.crai` index then it is used to find record boundaries. Otherwise, the whole CRAM
@@ -147,7 +148,7 @@ If the BAM/SAM files are not globally sorted, then they should be treated as `un
 CRAM and VCF files are always sorted by position. If reading multiple files that are not globally sorted, then they
 should be treated as unsorted, and should not be written out unless they are sorted first.
 
-### Partition Guarantees
+### Queryname Sorted Guarantees
 
 For reading `queryname` sorted BAM or SAM, paired reads must never be split across partitions. This allows
 applications to be sure that a single task will always be able to process read pairs together.
