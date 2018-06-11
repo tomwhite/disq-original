@@ -1,4 +1,4 @@
-package com.tom_e_white.squark.impl.formats.tabix;
+package com.tom_e_white.squark.impl.formats.tribble;
 
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import htsjdk.samtools.util.Locatable;
@@ -34,7 +34,7 @@ public class TribbleIndexIntervalFilteringTextInputFormat extends TextInputForma
   public List<InputSplit> getSplits(JobContext job) throws IOException {
     List<InputSplit> splits = super.getSplits(job);
 
-    // filter out any splits that do not overlap intervals, by using the tabix index
+    // filter out any splits that do not overlap intervals, by using the tribble index
     List<InputSplit> filteredSplits = new ArrayList<>();
     List<Block> blocks = new ArrayList<>();
     for (Locatable interval : intervals) {

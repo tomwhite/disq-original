@@ -4,7 +4,7 @@ import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.HadoopFileSystemWrapper;
 import com.tom_e_white.squark.impl.formats.bgzf.BGZFCodec;
 import com.tom_e_white.squark.impl.formats.bgzf.BGZFEnhancedGzipCodec;
-import com.tom_e_white.squark.impl.formats.tabix.TribbleIndexIntervalFilteringTextInputFormat;
+import com.tom_e_white.squark.impl.formats.tribble.TribbleIndexIntervalFilteringTextInputFormat;
 import htsjdk.samtools.Defaults;
 import htsjdk.samtools.SamStreams;
 import htsjdk.samtools.seekablestream.SeekableStream;
