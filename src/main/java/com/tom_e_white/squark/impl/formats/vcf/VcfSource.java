@@ -21,7 +21,6 @@ import htsjdk.tribble.util.TabixUtils;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFCodec;
 import htsjdk.variant.vcf.VCFHeader;
-import htsjdk.variant.vcf.VCFHeaderVersion;
 import java.io.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -49,22 +48,42 @@ public class VcfSource implements Serializable {
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
 
   public VCFHeader getFileHeader(JavaSparkContext jsc, String path) throws IOException {
-    Configuration conf = jsc.hadoopConfiguration();
-    String firstVcfPath;
-    if (fileSystemWrapper.isDirectory(conf, path)) {
-      firstVcfPath = fileSystemWrapper.firstFileInDirectory(conf, path);
-    } else {
-      firstVcfPath = path;
-    }
     try (SeekableStream headerIn =
-        fileSystemWrapper.open(jsc.hadoopConfiguration(), firstVcfPath)) {
-      BufferedInputStream bis = new BufferedInputStream(headerIn);
-      // despite the name, isGzippedSAMFile looks for any gzipped stream
-      InputStream is = SamStreams.isGzippedSAMFile(bis) ? new GZIPInputStream(bis) : bis;
+        fileSystemWrapper.open(jsc.hadoopConfiguration(), getFirstPath(jsc, path))) {
+      InputStream is = bufferAndDecompressIfNecessary(headerIn);
       FeatureCodecHeader featureCodecHeader =
           new VCFCodec().readHeader(new AsciiLineReaderIterator(AsciiLineReader.from(is)));
       return (VCFHeader) featureCodecHeader.getHeaderValue();
     }
+  }
+
+  private VCFCodec getVCFCodec(JavaSparkContext jsc, String path) throws IOException {
+    try (SeekableStream headerIn =
+        fileSystemWrapper.open(jsc.hadoopConfiguration(), getFirstPath(jsc, path))) {
+      InputStream is = bufferAndDecompressIfNecessary(headerIn);
+      VCFCodec vcfCodec = new VCFCodec();
+      vcfCodec.readHeader(new AsciiLineReaderIterator(AsciiLineReader.from(is)));
+      return vcfCodec;
+    }
+  }
+
+  private String getFirstPath(JavaSparkContext jsc, String path) throws IOException {
+    Configuration conf = jsc.hadoopConfiguration();
+    String firstPath;
+    if (fileSystemWrapper.isDirectory(conf, path)) {
+      firstPath = fileSystemWrapper.firstFileInDirectory(conf, path);
+    } else {
+      firstPath = path;
+    }
+    return firstPath;
+  }
+
+  private static InputStream bufferAndDecompressIfNecessary(final InputStream in)
+      throws IOException {
+    BufferedInputStream bis = new BufferedInputStream(in);
+    // despite the name, SamStreams.isGzippedSAMFile looks for any gzipped stream (including block
+    // compressed)
+    return SamStreams.isGzippedSAMFile(bis) ? new GZIPInputStream(bis) : bis;
   }
 
   public <T extends Locatable> JavaRDD<VariantContext> getVariants(
@@ -78,19 +97,14 @@ public class VcfSource implements Serializable {
     }
     enableBGZFCodecs(conf);
 
-    VCFHeader vcfHeader = getFileHeader(jsc, path);
-    Broadcast<VCFHeader> vcfHeaderBroadcast = jsc.broadcast(vcfHeader);
+    Broadcast<VCFCodec> vcfCodecBroadcast = jsc.broadcast(getVCFCodec(jsc, path));
     Broadcast<List<T>> intervalsBroadcast = intervals == null ? null : jsc.broadcast(intervals);
 
     return textFile(jsc, conf, path, intervals)
         .mapPartitions(
             (FlatMapFunction<Iterator<String>, VariantContext>)
                 lines -> {
-                  VCFCodec codec = new VCFCodec(); // Use map partitions so we can reuse codec (not
-                  // broadcast-able)
-                  codec.setVCFHeader(
-                      vcfHeaderBroadcast.getValue(),
-                      VCFHeaderVersion.VCF4_1); // TODO: how to determine version?
+                  VCFCodec codec = vcfCodecBroadcast.getValue();
                   final OverlapDetector<T> overlapDetector =
                       intervalsBroadcast == null
                           ? null

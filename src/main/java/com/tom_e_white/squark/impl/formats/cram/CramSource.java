@@ -107,7 +107,8 @@ public class CramSource extends AbstractSamSource implements Serializable {
                       span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
                       span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
                       SeekableStream ss = fileSystemWrapper.open(c, p);
-                      // TODO: should go through FileSystemWrapper, needs https://github.com/samtools/htsjdk/pull/1123
+                      // TODO: should go through FileSystemWrapper, needs
+                      // https://github.com/samtools/htsjdk/pull/1123
                       ReferenceSource referenceSource =
                           new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath));
                       intervalReadsIterator =
