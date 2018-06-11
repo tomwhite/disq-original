@@ -75,7 +75,7 @@ public abstract class AbstractSamSource implements Serializable {
       readerFactory.validationStringency(stringency);
     }
     if (referenceSourcePath != null) {
-      // TODO: should go through FileSystemWrapper
+      // TODO: should go through FileSystemWrapper, needs https://github.com/samtools/htsjdk/pull/1123
       readerFactory.referenceSource(
           new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath)));
     }

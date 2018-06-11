@@ -73,7 +73,7 @@ public class BamSink extends AbstractSamSink {
   }
 
   private void writeHeader(SAMFileHeader header, OutputStream out) throws IOException {
-    // TODO: this is copied from htsjdk BAMFileWriter#writeHeader, which is protected.
+    // TODO: this is copied from htsjdk BAMFileWriter#writeHeader, which is protected; see https://github.com/samtools/htsjdk/pull/1119
     final StringWriter headerTextBuffer = new StringWriter();
     new SAMTextHeaderCodec().encode(headerTextBuffer, header);
     final String headerText = headerTextBuffer.toString();
