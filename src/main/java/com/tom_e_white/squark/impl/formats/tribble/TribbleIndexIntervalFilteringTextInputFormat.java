@@ -1,6 +1,6 @@
 package com.tom_e_white.squark.impl.formats.tribble;
 
-import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
+import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.index.Block;
 import htsjdk.tribble.index.Index;
@@ -48,9 +48,10 @@ public class TribbleIndexIntervalFilteringTextInputFormat extends TextInputForma
         filteredSplits.add(split);
       } else {
         FileSplit fileSplit = (FileSplit) split;
-        long virtualSplitStart = BgzfVirtualFilePointerUtil.makeFilePointer(fileSplit.getStart());
+        long virtualSplitStart =
+            BlockCompressedFilePointerUtil.makeFilePointer(fileSplit.getStart());
         long virtualSplitEnd =
-            BgzfVirtualFilePointerUtil.makeFilePointer(
+            BlockCompressedFilePointerUtil.makeFilePointer(
                 fileSplit.getStart() + fileSplit.getLength());
         for (Block block : blocks) {
           long blockStart = block.getStartPosition();

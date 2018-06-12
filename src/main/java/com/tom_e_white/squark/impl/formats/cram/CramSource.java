@@ -6,7 +6,6 @@ import com.tom_e_white.squark.impl.file.*;
 import com.tom_e_white.squark.impl.formats.AutocloseIteratorWrapper;
 import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
-import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import com.tom_e_white.squark.impl.formats.sam.SamFormat;
 import htsjdk.samtools.*;
@@ -16,6 +15,7 @@ import htsjdk.samtools.cram.CRAIIndex;
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.cram.structure.Container;
 import htsjdk.samtools.seekablestream.SeekableStream;
+import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.io.Serializable;
@@ -213,8 +213,8 @@ public class CramSource extends AbstractSamSource implements Serializable {
                       new PathChunk(
                           p,
                           new Chunk(
-                              BgzfVirtualFilePointerUtil.makeFilePointer(newStart),
-                              BgzfVirtualFilePointerUtil.makeFilePointer(newEnd - 1)));
+                              BlockCompressedFilePointerUtil.makeFilePointer(newStart),
+                              BlockCompressedFilePointerUtil.makeFilePointer(newEnd - 1)));
                   return Collections.singleton(pathChunk).iterator();
                 });
   }

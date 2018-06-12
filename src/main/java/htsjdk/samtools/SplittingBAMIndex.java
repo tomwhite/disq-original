@@ -1,6 +1,5 @@
 package htsjdk.samtools;
 
-import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import htsjdk.samtools.util.BinaryCodec;
 import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
 import htsjdk.samtools.util.RuntimeEOFException;
@@ -182,8 +181,8 @@ public final class SplittingBAMIndex {
     if (splitEnd > fileSize) {
       splitEnd = fileSize;
     }
-    long virtualSplitStart = BgzfVirtualFilePointerUtil.makeFilePointer(splitStart);
-    long virtualSplitEnd = BgzfVirtualFilePointerUtil.makeFilePointer(splitEnd);
+    long virtualSplitStart = BlockCompressedFilePointerUtil.makeFilePointer(splitStart);
+    long virtualSplitEnd = BlockCompressedFilePointerUtil.makeFilePointer(splitEnd);
     Long virtualSplitStartAlignment = virtualOffsets.ceiling(virtualSplitStart);
     Long virtualSplitEndAlignment = virtualOffsets.ceiling(virtualSplitEnd);
     // neither virtualSplitStartAlignment nor virtualSplitEndAlignment should ever be null, but

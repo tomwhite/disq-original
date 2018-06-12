@@ -12,12 +12,12 @@ import com.tom_e_white.squark.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.squark.impl.formats.SerializableHadoopConfiguration;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockGuesser.BgzfBlock;
 import com.tom_e_white.squark.impl.formats.bgzf.BgzfBlockSource;
-import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import com.tom_e_white.squark.impl.formats.sam.AbstractSamSource;
 import com.tom_e_white.squark.impl.formats.sam.SamFormat;
 import htsjdk.samtools.*;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
 import htsjdk.samtools.seekablestream.SeekableStream;
+import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.io.Serializable;
@@ -236,11 +236,11 @@ public class BamSource extends AbstractSamSource implements Serializable {
           if (index > MAX_READ_SIZE) {
             return null;
           }
-          long vPos = BgzfVirtualFilePointerUtil.makeFilePointer(block.pos, up);
+          long vPos = BlockCompressedFilePointerUtil.makeFilePointer(block.pos, up);
           // As the guesser goes to the next BGZF block before looking for BAM
           // records, the ending BGZF blocks have to always be traversed fully.
           // Hence force the length to be 0xffff, the maximum possible.
-          long vEnd = BgzfVirtualFilePointerUtil.makeFilePointer(block.end, 0xffff);
+          long vEnd = BlockCompressedFilePointerUtil.makeFilePointer(block.end, 0xffff);
           if (bamRecordGuesser.checkRecordStart(vPos)) {
             block.end();
             return new PathChunk(partitionPath, new Chunk(vPos, vEnd));

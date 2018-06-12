@@ -1,6 +1,5 @@
 package htsjdk.samtools;
 
-import com.tom_e_white.squark.impl.formats.bgzf.BgzfVirtualFilePointerUtil;
 import htsjdk.samtools.cram.io.InputStreamUtils;
 import htsjdk.samtools.seekablestream.SeekablePathStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
@@ -148,7 +147,7 @@ public final class SplittingBAMIndexer {
    * @param inputSize the size of the input BAM file
    */
   public void finish(long inputSize) {
-    writeVirtualOffset(BgzfVirtualFilePointerUtil.makeFilePointer(inputSize));
+    writeVirtualOffset(BlockCompressedFilePointerUtil.makeFilePointer(inputSize));
     binaryCodec.close();
   }
 
