@@ -2,11 +2,11 @@ package com.tom_e_white.disq.impl.file;
 
 import htsjdk.samtools.seekablestream.SeekableBufferedStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 public class HadoopFileSystemWrapper implements FileSystemWrapper {
 
   private static final Logger logger = LoggerFactory.getLogger(HadoopFileSystemWrapper.class);
+  private static final boolean TRACK_UNCLOSED_STREAMS =
+      false; // set to true and run tests to see if any streams are not being closed
 
   @Override
   public String normalize(Configuration conf, String path) throws IOException {
@@ -121,14 +123,49 @@ public class HadoopFileSystemWrapper implements FileSystemWrapper {
   public static class SeekableHadoopStream<S extends InputStream & Seekable>
       extends SeekableStream {
 
+    private static Set<SeekableHadoopStream> unclosedStreams = new LinkedHashSet<>();
+
+    static {
+      if (TRACK_UNCLOSED_STREAMS) {
+        Runtime.getRuntime()
+            .addShutdownHook(
+                new Thread(
+                    () -> {
+                      if (unclosedStreams.isEmpty()) {
+                        System.out.println("No dangling input streams");
+                      } else {
+                        System.out.println("Dangling input streams");
+                        unclosedStreams.forEach(
+                            s -> System.out.println(s.source + "\n" + s.constructionStackTrace));
+                      }
+                    }));
+      }
+    }
+
     private final S in;
     private final long length;
     private final String source;
+    private final String constructionStackTrace;
 
     public SeekableHadoopStream(S seekableIn, long length, String source) {
       this.in = seekableIn;
       this.length = length;
       this.source = source;
+      this.constructionStackTrace = getStackTrace();
+      if (TRACK_UNCLOSED_STREAMS) {
+        unclosedStreams.add(this);
+      }
+    }
+
+    private String getStackTrace() {
+      if (TRACK_UNCLOSED_STREAMS) {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        try (PrintWriter pw = new PrintWriter(bos)) {
+          new Throwable().printStackTrace(pw);
+        }
+        return new String(bos.toByteArray());
+      }
+      return null;
     }
 
     @Override
@@ -158,6 +195,9 @@ public class HadoopFileSystemWrapper implements FileSystemWrapper {
 
     @Override
     public void close() throws IOException {
+      if (TRACK_UNCLOSED_STREAMS) {
+        unclosedStreams.remove(this);
+      }
       in.close();
     }
 
