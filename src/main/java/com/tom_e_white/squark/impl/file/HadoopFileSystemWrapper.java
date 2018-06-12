@@ -1,6 +1,6 @@
 package com.tom_e_white.squark.impl.file;
 
-import htsjdk.samtools.ExtSeekableBufferedStream;
+import htsjdk.samtools.seekablestream.SeekableBufferedStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,7 +32,7 @@ public class HadoopFileSystemWrapper implements FileSystemWrapper {
     Path p = new Path(path);
     FileSystem fileSystem = p.getFileSystem(conf);
     long len = fileSystem.getFileStatus(p).getLen();
-    return new ExtSeekableBufferedStream(new SeekableHadoopStream<>(fileSystem.open(p), len, path));
+    return new SeekableBufferedStream(new SeekableHadoopStream<>(fileSystem.open(p), len, path));
   }
 
   @Override

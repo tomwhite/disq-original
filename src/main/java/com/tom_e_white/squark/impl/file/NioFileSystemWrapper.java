@@ -1,6 +1,6 @@
 package com.tom_e_white.squark.impl.file;
 
-import htsjdk.samtools.ExtSeekableBufferedStream;
+import htsjdk.samtools.seekablestream.SeekableBufferedStream;
 import htsjdk.samtools.seekablestream.SeekablePathStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import java.io.IOException;
@@ -24,7 +24,7 @@ public class NioFileSystemWrapper implements FileSystemWrapper {
 
   @Override
   public SeekableStream open(Configuration conf, String path) throws IOException {
-    return new ExtSeekableBufferedStream(new SeekablePathStream(asPath(path)));
+    return new SeekableBufferedStream(new SeekablePathStream(asPath(path)));
   }
 
   @Override
