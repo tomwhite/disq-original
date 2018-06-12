@@ -12,6 +12,7 @@ import htsjdk.samtools.*;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
 import htsjdk.samtools.cram.CRAIEntry;
 import htsjdk.samtools.cram.CRAIIndex;
+import htsjdk.samtools.cram.build.CramContainerHeaderIterator;
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.cram.structure.Container;
 import htsjdk.samtools.seekablestream.SeekableStream;
