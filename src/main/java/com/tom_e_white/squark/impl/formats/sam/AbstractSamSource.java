@@ -3,12 +3,7 @@ package com.tom_e_white.squark.impl.formats.sam;
 import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.FileSystemWrapper;
 import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
-import htsjdk.samtools.SAMFileHeader;
-import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SamInputResource;
-import htsjdk.samtools.SamReader;
-import htsjdk.samtools.SamReaderFactory;
-import htsjdk.samtools.ValidationStringency;
+import htsjdk.samtools.*;
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Locatable;
@@ -84,7 +79,9 @@ public abstract class AbstractSamSource implements Serializable {
     if (indexStream != null) {
       resource.index(indexStream);
     }
-    return readerFactory.open(resource);
+    SamReader samReader = readerFactory.open(resource);
+    ensureIndexWillBeClosed(samReader);
+    return samReader;
   }
 
   protected SeekableStream findIndex(Configuration conf, String path) throws IOException {
@@ -103,6 +100,17 @@ public abstract class AbstractSamSource implements Serializable {
       return fileSystemWrapper.open(conf, index);
     }
     return null;
+  }
+
+  private SamReader ensureIndexWillBeClosed(SamReader samReader) {
+    SamReader.PrimitiveSamReader underlyingReader =
+        ((SamReader.PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
+    if (underlyingReader.hasIndex()) {
+      // force BAMFileReader#mIndex to be populated so the index stream is properly
+      // closed by the close() method
+      underlyingReader.getIndex();
+    }
+    return samReader;
   }
 
   protected static <T> Stream<T> stream(final Iterator<T> iterator) {

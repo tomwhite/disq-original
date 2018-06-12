@@ -90,14 +90,18 @@ public class CramSource extends AbstractSamSource implements Serializable {
                         cramFileReader.getIterator(splitSpan), samReader);
                   } else {
                     if (!samReader.hasIndex()) {
+                      samReader.close();
                       throw new IllegalArgumentException(
                           "Intervals set but no CRAM index file found for " + p);
                     }
                     BAMIndex idx = samReader.indexing().getIndex();
+                    long startOfLastLinearBin = idx.getStartOfLastLinearBin();
+                    long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
                     Iterator<SAMRecord> intervalReadsIterator;
                     if (traversal.getIntervalsForTraversal() == null
                         || traversal.getIntervalsForTraversal().isEmpty()) {
                       intervalReadsIterator = Collections.emptyIterator();
+                      samReader.close(); // not used from this point on
                     } else {
                       SAMFileHeader header = samReader.getFileHeader();
                       QueryInterval[] queryIntervals =
@@ -122,11 +126,11 @@ public class CramSource extends AbstractSamSource implements Serializable {
                                   validationStringency,
                                   span.toCoordinateArray()),
                               ss);
+                      samReader.close(); // not used from this point on
                     }
 
                     // add on unplaced unmapped reads if there are any in this range
                     if (traversal.getTraverseUnplacedUnmapped()) {
-                      long startOfLastLinearBin = idx.getStartOfLastLinearBin();
                       // noCoordinateCount always seems to be 0, so ignore
                       if (startOfLastLinearBin != -1) {
                         long unplacedUnmappedStart = startOfLastLinearBin;
@@ -142,9 +146,6 @@ public class CramSource extends AbstractSamSource implements Serializable {
                           return Iterators.concat(
                               intervalReadsIterator, unplacedUnmappedReadsIterator);
                         }
-                      }
-                      if (traversal.getIntervalsForTraversal() == null) {
-                        samReader.close(); // not used any more
                       }
                     }
                     return intervalReadsIterator;

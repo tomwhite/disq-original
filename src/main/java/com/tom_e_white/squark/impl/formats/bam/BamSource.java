@@ -109,14 +109,18 @@ public class BamSource extends AbstractSamSource implements Serializable {
                         bamFileReader.getIterator(splitSpan), samReader);
                   } else {
                     if (!samReader.hasIndex()) {
+                      samReader.close();
                       throw new IllegalArgumentException(
                           "Intervals set but no BAM index file found for " + p);
                     }
                     BAMIndex idx = samReader.indexing().getIndex();
+                    long startOfLastLinearBin = idx.getStartOfLastLinearBin();
+                    long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
                     Iterator<SAMRecord> intervalReadsIterator;
                     if (traversal.getIntervalsForTraversal() == null
                         || traversal.getIntervalsForTraversal().isEmpty()) {
                       intervalReadsIterator = Collections.emptyIterator();
+                      samReader.close(); // not used from this point on
                     } else {
                       SAMFileHeader header = samReader.getFileHeader();
                       QueryInterval[] queryIntervals =
@@ -134,8 +138,6 @@ public class BamSource extends AbstractSamSource implements Serializable {
 
                     // add on unplaced unmapped reads if there are any in this range
                     if (traversal.getTraverseUnplacedUnmapped()) {
-                      long startOfLastLinearBin = idx.getStartOfLastLinearBin();
-                      long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
                       if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
                         long unplacedUnmappedStart = startOfLastLinearBin;
                         if (pathChunk.getSpan().getChunkStart() <= unplacedUnmappedStart
@@ -150,9 +152,6 @@ public class BamSource extends AbstractSamSource implements Serializable {
                           return Iterators.concat(
                               intervalReadsIterator, unplacedUnmappedReadsIterator);
                         }
-                      }
-                      if (traversal.getIntervalsForTraversal() == null) {
-                        samReader.close(); // not used any more
                       }
                     }
                     return intervalReadsIterator;
@@ -171,22 +170,23 @@ public class BamSource extends AbstractSamSource implements Serializable {
     // TODO: handle directory of bai files
     String splittingBaiPath = path + SplittingBAMIndex.FILE_EXTENSION;
     if (fileSystemWrapper.exists(jsc.hadoopConfiguration(), splittingBaiPath)) {
-      SplittingBAMIndex splittingBAMIndex =
-          SplittingBAMIndex.load(
-              fileSystemWrapper.open(jsc.hadoopConfiguration(), splittingBaiPath));
-      Broadcast<SplittingBAMIndex> splittingBAMIndexBroadcast = jsc.broadcast(splittingBAMIndex);
-      pathSplitSource
-          .getPathSplits(jsc, path, splitSize)
-          .flatMap(
-              pathSplit -> {
-                SplittingBAMIndex index = splittingBAMIndexBroadcast.getValue();
-                Chunk chunk = index.getChunk(pathSplit.getStart(), pathSplit.getEnd());
-                if (chunk == null) {
-                  return Collections.emptyIterator();
-                } else {
-                  return Collections.singleton(new PathChunk(path, chunk)).iterator();
-                }
-              });
+      try (SeekableStream sbiStream =
+          fileSystemWrapper.open(jsc.hadoopConfiguration(), splittingBaiPath)) {
+        SplittingBAMIndex splittingBAMIndex = SplittingBAMIndex.load(sbiStream);
+        Broadcast<SplittingBAMIndex> splittingBAMIndexBroadcast = jsc.broadcast(splittingBAMIndex);
+        pathSplitSource
+            .getPathSplits(jsc, path, splitSize)
+            .flatMap(
+                pathSplit -> {
+                  SplittingBAMIndex index = splittingBAMIndexBroadcast.getValue();
+                  Chunk chunk = index.getChunk(pathSplit.getStart(), pathSplit.getEnd());
+                  if (chunk == null) {
+                    return Collections.emptyIterator();
+                  } else {
+                    return Collections.singleton(new PathChunk(path, chunk)).iterator();
+                  }
+                });
+      }
     }
 
     SerializableHadoopConfiguration confSer =
