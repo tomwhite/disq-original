@@ -13,7 +13,6 @@ import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
 import htsjdk.samtools.cram.CRAIEntry;
 import htsjdk.samtools.cram.CRAIIndex;
 import htsjdk.samtools.cram.build.CramContainerHeaderIterator;
-import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.cram.structure.Container;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
@@ -111,23 +110,11 @@ public class CramSource extends AbstractSamSource implements Serializable {
                       BAMFileSpan span = BAMFileReader.getFileSpan(queryIntervals, idx);
                       span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
                       span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
-                      SeekableStream ss = fileSystemWrapper.open(c, p);
-                      // TODO: should go through FileSystemWrapper, needs
-                      // https://github.com/samtools/htsjdk/pull/1123
-                      ReferenceSource referenceSource =
-                          new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath));
                       intervalReadsIterator =
                           new AutocloseIteratorWrapper<>(
-                              new CRAMIntervalIterator(
-                                  queryIntervals,
-                                  false,
-                                  idx,
-                                  ss,
-                                  referenceSource,
-                                  validationStringency,
-                                  span.toCoordinateArray()),
-                              ss);
-                      samReader.close(); // not used from this point on
+                              cramFileReader.createIndexIterator(
+                                  queryIntervals, false, span.toCoordinateArray()),
+                              samReader);
                     }
 
                     // add on unplaced unmapped reads if there are any in this range
