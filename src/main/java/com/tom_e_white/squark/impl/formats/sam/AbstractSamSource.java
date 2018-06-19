@@ -2,9 +2,11 @@ package com.tom_e_white.squark.impl.formats.sam;
 
 import com.tom_e_white.squark.HtsjdkReadsTraversalParameters;
 import com.tom_e_white.squark.impl.file.FileSystemWrapper;
-import com.tom_e_white.squark.impl.file.NioFileSystemWrapper;
 import htsjdk.samtools.*;
 import htsjdk.samtools.cram.ref.ReferenceSource;
+import htsjdk.samtools.reference.FastaSequenceIndex;
+import htsjdk.samtools.reference.ReferenceSequenceFile;
+import htsjdk.samtools.reference.ReferenceSequenceFileFactory;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
@@ -70,10 +72,14 @@ public abstract class AbstractSamSource implements Serializable {
       readerFactory.validationStringency(stringency);
     }
     if (referenceSourcePath != null) {
-      // TODO: should go through FileSystemWrapper, needs
-      // https://github.com/samtools/htsjdk/pull/1123
-      readerFactory.referenceSource(
-          new ReferenceSource(NioFileSystemWrapper.asPath(referenceSourcePath)));
+      SeekableStream refIn = fileSystemWrapper.open(conf, referenceSourcePath);
+      try (SeekableStream indexIn = fileSystemWrapper.open(conf, referenceSourcePath + ".fai")) {
+        FastaSequenceIndex index = new FastaSequenceIndex(indexIn);
+        ReferenceSequenceFile refSeqFile =
+            ReferenceSequenceFileFactory.getReferenceSequenceFile(
+                referenceSourcePath, refIn, index);
+        readerFactory.referenceSource(new ReferenceSource(refSeqFile));
+      }
     }
     SamInputResource resource = SamInputResource.of(in);
     if (indexStream != null) {
