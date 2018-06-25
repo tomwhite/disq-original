@@ -1,4 +1,4 @@
-# Squark
+# Disq
 
 A library for manipulating bioinformatics sequencing formats in Apache Spark.
 
@@ -180,7 +180,7 @@ Then to use the library in your project, add the following dependency to your Ma
 ```xml
 <dependency>
     <groupId>com.tom_e_white</groupId>
-    <artifactId>squark</artifactId>
+    <artifactId>disq</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
@@ -200,7 +200,7 @@ JavaRDD<SAMRecord> reads = HtsjdkReadsRddStorage.makeDefault(jsc)
 ## Implementation notes for developers
 
 The library requires Java 8 or later. The surface area of the API has deliberately been kept small by exposing only a
-few public classes in the top-level `squark` package, and putting all the private implementation classes in `impl`
+few public classes in the top-level `disq` package, and putting all the private implementation classes in `impl`
 packages. Users should not access anything in `impl`. While it is not possible to enforce this, anything in `impl`
 is not subject to release versioning rules (i.e. it could be removed in any release).
 

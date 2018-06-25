@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.tom_e_white</groupId>
-    <artifactId>squark</artifactId>
+    <artifactId>disq</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
     <properties>
@@ -77,11 +77,11 @@
                             <rules>
                                 <requireMavenVersion>
                                     <version>[3.3.9,)</version>
-                                    <message>Squark requires Maven 3.3.9 or greater</message>
+                                    <message>Maven 3.3.9 or greater is required</message>
                                 </requireMavenVersion>
                                 <requireJavaVersion>
                                     <version>[1.8,)</version>
-                                    <message>Squark requires Java 1.8 or greater</message>
+                                    <message>Java 1.8 or greater is required</message>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>
@@ -106,7 +106,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.0.1</version>
                 <configuration>
-                    <excludePackageNames>com.tom_e_white.squark.impl.*,htsjdk.*</excludePackageNames>
+                    <excludePackageNames>com.tom_e_white.disq.impl.*,htsjdk.*</excludePackageNames>
                     <failOnError>true</failOnError>
                 </configuration>
                 <executions>
@@ -146,7 +146,7 @@
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <version>3.1.5</version>
                 <configuration>
-                    <onlyAnalyze>com.tom_e_white.squark.-</onlyAnalyze>
+                    <onlyAnalyze>com.tom_e_white.disq.-</onlyAnalyze>
                     <xmlOutput>true</xmlOutput>
                 </configuration>
                 <executions>
