@@ -67,7 +67,7 @@
                 <!-- If this fails the build, type 'mvn fmt:format' from the command line to reformat code. -->
                 <groupId>com.coveo</groupId>
                 <artifactId>fmt-maven-plugin</artifactId>
-                <version>2.2.0</version>
+                <version>2.5.1</version>
                 <executions>
                     <execution>
                         <goals>
@@ -79,7 +79,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.0.0</version>
+                <version>3.0.1</version>
                 <configuration>
                     <excludePackageNames>com.tom_e_white.squark.impl.*,htsjdk.*</excludePackageNames>
                     <failOnError>true</failOnError>
@@ -97,6 +97,9 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.1</version>
+                <configuration>
+                    <excludes>htsjdk/samtools/**/*</excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>jacoco-initialize</id>
