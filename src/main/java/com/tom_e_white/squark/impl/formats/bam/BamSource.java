@@ -72,7 +72,6 @@ public class BamSource extends AbstractBinarySamSource implements Serializable {
       String referenceSourcePath)
       throws IOException {
 
-    // TODO: handle directory of bai files
     String splittingBaiPath = path + SplittingBAMIndex.FILE_EXTENSION;
     if (fileSystemWrapper.exists(jsc.hadoopConfiguration(), splittingBaiPath)) {
       try (SeekableStream sbiStream =

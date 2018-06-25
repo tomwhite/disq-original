@@ -109,7 +109,6 @@ public class CramSource extends AbstractBinarySamSource implements Serializable 
                   if (newStart == newEnd) {
                     return Collections.emptyIterator();
                   }
-                  // TODO: test edge cases
                   // Subtract one from end since CRAMIterator's boundaries are inclusive
                   PathChunk pathChunk =
                       new PathChunk(

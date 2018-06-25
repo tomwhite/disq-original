@@ -38,7 +38,6 @@ public class PathSplitSource implements Serializable {
       // Use Java NIO by creating splits with Spark parallelize. File locality is not maintained,
       // but this is not an issue if reading from a cloud store.
 
-      // TODO: support case where path is a directory
       long len = fileSystemWrapper.getFileLength(null, path);
       int numSplits = (int) Math.ceil((double) len / splitSize);
 

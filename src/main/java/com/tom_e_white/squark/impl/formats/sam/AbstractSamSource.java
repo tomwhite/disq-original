@@ -35,7 +35,6 @@ public abstract class AbstractSamSource implements Serializable {
       ValidationStringency stringency,
       String referenceSourcePath)
       throws IOException {
-    // TODO: support multiple headers
     Configuration conf = jsc.hadoopConfiguration();
     String firstSamPath;
     if (fileSystemWrapper.isDirectory(conf, path)) {

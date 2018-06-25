@@ -50,7 +50,6 @@ public class BgzfBlockSource implements Serializable {
                       getBgzfSplitGuesser(confSer.getConf(), pathSplit.getPath());
                   return getBgzfBlockIterator(bgzfBlockGuesser, pathSplit);
                 });
-    // TODO: drop final empty block
   }
 
   private BgzfBlockGuesser getBgzfSplitGuesser(Configuration conf, String path) throws IOException {

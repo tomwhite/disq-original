@@ -119,7 +119,7 @@ public abstract class AbstractBinarySamSource extends AbstractSamSource {
                         long unplacedUnmappedStart = startOfLastLinearBin;
                         if (pathChunk.getSpan().getChunkStart() <= unplacedUnmappedStart
                             && unplacedUnmappedStart
-                                < pathChunk.getSpan().getChunkEnd()) { // TODO correct?
+                                < pathChunk.getSpan().getChunkEnd()) {
                           SamReader unplacedUnmappedReadsSamReader =
                               createSamReader(c, p, validationStringency, referenceSourcePath);
                           Iterator<SAMRecord> unplacedUnmappedReadsIterator =
