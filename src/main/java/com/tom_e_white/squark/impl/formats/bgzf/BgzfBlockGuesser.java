@@ -26,6 +26,8 @@ public class BgzfBlockGuesser implements Closeable {
   }
 
   public static class BgzfBlock implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     public String path;
     public long pos;
     public int cSize;

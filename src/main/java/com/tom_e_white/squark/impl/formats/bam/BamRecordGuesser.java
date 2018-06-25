@@ -13,10 +13,11 @@ import org.apache.hadoop.io.IOUtils;
 
 class BamRecordGuesser implements Closeable {
 
+  private static final int READS_TO_CHECK = 10;
+
   private final BlockCompressedInputStream uncompressedBytes;
   private final int referenceSequenceCount;
   private final SAMFileHeader header;
-  private final int readsToCheck = 10;
 
   private final ByteBuffer buf = ByteBuffer.allocate(36).order(ByteOrder.LITTLE_ENDIAN);
 
@@ -35,7 +36,7 @@ class BamRecordGuesser implements Closeable {
   }
 
   private boolean checkRecordStart(long vPos, int successfulReads) {
-    if (successfulReads == readsToCheck) {
+    if (successfulReads == READS_TO_CHECK) {
       return true;
     }
     try {
