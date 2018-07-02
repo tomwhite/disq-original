@@ -1,11 +1,12 @@
 package com.tom_e_white.disq.impl.file;
 
-import htsjdk.samtools.seekablestream.SeekableBufferedStream;
 import htsjdk.samtools.seekablestream.SeekablePathStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
+import htsjdk.samtools.util.RuntimeIOException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -13,9 +14,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
+import java.util.function.Function;
 import org.apache.hadoop.conf.Configuration;
 
 public class NioFileSystemWrapper implements FileSystemWrapper {
+
+  private static final int PREFETCHER_BUFFER_SIZE_MB = 4;
 
   @Override
   public String normalize(Configuration conf, String path) {
@@ -24,7 +28,15 @@ public class NioFileSystemWrapper implements FileSystemWrapper {
 
   @Override
   public SeekableStream open(Configuration conf, String path) throws IOException {
-    return new SeekableBufferedStream(new SeekablePathStream(asPath(path)));
+    Function<SeekableByteChannel, SeekableByteChannel> prefetcherWrapper =
+        channel -> {
+          try {
+            return SeekableByteChannelPrefetcher.addPrefetcher(PREFETCHER_BUFFER_SIZE_MB, channel);
+          } catch (IOException e) {
+            throw new RuntimeIOException(e);
+          }
+        };
+    return new SeekablePathStream(asPath(path), prefetcherWrapper);
   }
 
   @Override
