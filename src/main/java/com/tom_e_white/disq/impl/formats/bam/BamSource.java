@@ -20,7 +20,6 @@ import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
 import htsjdk.samtools.SplittingBAMIndex;
 import htsjdk.samtools.ValidationStringency;
-import htsjdk.samtools.seekablestream.SeekableBufferedStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
 import htsjdk.samtools.util.CloseableIterator;
@@ -161,7 +160,7 @@ public class BamSource extends AbstractBinarySamSource implements Serializable {
 
   private BamRecordGuesser getBamRecordGuesser(
       Configuration conf, String path, SAMFileHeader header) throws IOException {
-    SeekableStream ss = new SeekableBufferedStream(fileSystemWrapper.open(conf, path));
+    SeekableStream ss = fileSystemWrapper.open(conf, path);
     return new BamRecordGuesser(ss, header.getSequenceDictionary().size(), header);
   }
 
