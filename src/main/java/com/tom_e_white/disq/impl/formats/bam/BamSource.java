@@ -16,9 +16,9 @@ import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileSpan;
 import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SBIIndex;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReader.PrimitiveSamReaderToSamReaderAdapter;
-import htsjdk.samtools.SplittingBAMIndex;
 import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
@@ -71,17 +71,16 @@ public class BamSource extends AbstractBinarySamSource implements Serializable {
       String referenceSourcePath)
       throws IOException {
 
-    String splittingBaiPath = path + SplittingBAMIndex.FILE_EXTENSION;
-    if (fileSystemWrapper.exists(jsc.hadoopConfiguration(), splittingBaiPath)) {
-      try (SeekableStream sbiStream =
-          fileSystemWrapper.open(jsc.hadoopConfiguration(), splittingBaiPath)) {
-        SplittingBAMIndex splittingBAMIndex = SplittingBAMIndex.load(sbiStream);
-        Broadcast<SplittingBAMIndex> splittingBAMIndexBroadcast = jsc.broadcast(splittingBAMIndex);
+    String sbiPath = path + SBIIndex.FILE_EXTENSION;
+    if (fileSystemWrapper.exists(jsc.hadoopConfiguration(), sbiPath)) {
+      try (SeekableStream sbiStream = fileSystemWrapper.open(jsc.hadoopConfiguration(), sbiPath)) {
+        SBIIndex sbiIndex = SBIIndex.load(sbiStream);
+        Broadcast<SBIIndex> sbiIndexBroadcast = jsc.broadcast(sbiIndex);
         pathSplitSource
             .getPathSplits(jsc, path, splitSize)
             .flatMap(
                 pathSplit -> {
-                  SplittingBAMIndex index = splittingBAMIndexBroadcast.getValue();
+                  SBIIndex index = sbiIndexBroadcast.getValue();
                   Chunk chunk = index.getChunk(pathSplit.getStart(), pathSplit.getEnd());
                   if (chunk == null) {
                     return Collections.emptyIterator();

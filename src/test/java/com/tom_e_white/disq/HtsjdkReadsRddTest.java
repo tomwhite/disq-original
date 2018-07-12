@@ -71,7 +71,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
     Assert.assertEquals(expectedCount, htsjdkReadsRddStorage.read(outputPath).getReads().count());
   }
 
-  private Object[] parametersForTestReadUsingSplittingBai() {
+  private Object[] parametersForTestReadUsingSBIIndex() {
     return new Object[][] {
       {"1-with-splitting-index.bam", 128 * 1024, false},
       {"1-with-splitting-index.bam", 128 * 1024, true},
@@ -80,7 +80,7 @@ public class HtsjdkReadsRddTest extends BaseTest {
 
   @Test
   @Parameters
-  public void testReadUsingSplittingBai(String inputFile, int splitSize, boolean useNio)
+  public void testReadUsingSBIIndex(String inputFile, int splitSize, boolean useNio)
       throws Exception {
     String inputPath = getPath(inputFile);
 
