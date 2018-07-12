@@ -1,5 +1,8 @@
 package com.tom_e_white.disq.impl.file;
 
+import java.util.Objects;
+
+/** Like Hadoop's FileSplit, but with a general path. */
 public class PathSplit {
   private final String path;
   private final long start;
@@ -21,5 +24,23 @@ public class PathSplit {
 
   public long getEnd() {
     return end;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    PathSplit pathSplit = (PathSplit) o;
+    return start == pathSplit.start && end == pathSplit.end && Objects.equals(path, pathSplit.path);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(path, start, end);
+  }
+
+  @Override
+  public String toString() {
+    return "PathSplit{" + "path='" + path + '\'' + ", start=" + start + ", end=" + end + '}';
   }
 }
