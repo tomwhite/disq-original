@@ -5,12 +5,14 @@ A library for manipulating bioinformatics sequencing formats in Apache Spark.
 *NOTE: this is alpha software - everything is in flux at the moment*
 
 ## Motivation
-Bounded
+
 This code grew out of, and was heavily inspired by, [Hadoop-BAM](https://github.com/HadoopGenomics/Hadoop-BAM) and
 [Spark-BAM](http://www.hammerlab.org/spark-bam/). Spark-BAM has shown that reading BAMs for Spark can be both more
 correct and more performant than the Hadoop-BAM implementation. Furthermore, all known users of Hadoop-BAM are using
 Spark, not MapReduce, as their processing engine so it is natural to target the Spark API, which gives us higher-level
 primitives than raw MR.
+
+[Benchmarks](https://github.com/tomwhite/disq-benchmarks): Disq is faster and more accurate than Hadoop-BAM, and at least as fast as Spark-BAM.
 
 ## Support Matrix
 
@@ -33,7 +35,7 @@ below for details on each feature.
 | Ordering guarantees             | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Queryname sorted guarantees     | :x:                           | NA                            | :x:                           | NA                            |
 | Stringency                      | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | NA                            |
-| Testing - large files           | :x:                           | :x:                           | :x:                           | :x:                           |
+| Testing - large files           | :white_check_mark:            | :white_check_mark:            | :x:                           | :white_check_mark:            |
 | Testing - samtools and bcftools | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 
 ## Features
@@ -164,8 +166,7 @@ For reading BAM/CRAM/SAM, the stringency settings from htsjdk are supported.
 All read and write paths are tested on real files from the field (multi-GB in size).
 
 [Samtools and Bcftools](http://www.htslib.org/download/) are used to verify that files written with this library can be
-read successfully. (Version 1.4 of samtools, and 1.3 of bcftools were used. The latter was needed to avoid
-[this bug](https://github.com/samtools/bcftools/issues/420).)
+read successfully.
 
 ## Building
 
@@ -212,3 +213,38 @@ As a general rule, any code that does not have a Spark or Hadoop dependency, or 
 belongs in htsjdk. This rule may be broken during a transition period while the code is being moved to htsjdk.
 See [here](https://github.com/samtools/htsjdk/issues/1112) for some of the proposed htsjdk changes.
 
+## Interoperability tests
+
+Some tests use Samtools and Bcftools to check that files created with this library are readable with them (and htsjdk).
+
+To run the tests first install [Samtools and Bcftools](http://www.htslib.org/download/).
+(Version 1.4 of samtools, and 1.3 of bcftools were used. The latter was needed to avoid
+[this bug](https://github.com/samtools/bcftools/issues/420).)
+
+Then, when running tests, specify where the binaries are on your system as follows:
+
+```
+mvn test \
+    -Ddisq.samtools.bin=/path/to/bin/samtools \
+    -Ddisq.bcftools.bin=/path/to/bin/bcftools
+```
+
+## Real world file testing
+
+The files used for unit testing are small and used to test particular features of the library.
+It is also valuable to run tests against more realistic files, which tend to be a lot larger.
+
+`RealWorldFilesIT` is an integration test that will recursively find files that it can parse in a given
+directory, and count the number of records in each of them. The counts are compared against the equivalent
+htsjdk code, as well as Samtools and Bcftools commands (if configured as above).
+
+The following tests all the [GATK 'large' files](https://github.com/broadinstitute/gatk/tree/master/src/test/resources/large)
+(BAM, CRAM, VCF) that have been copied to the local filesystem beforehand:
+
+```
+mvn verify \
+    -Ddisq.test.real.world.files.dir=/home/gatk/src/test/resources/large \
+    -Ddisq.test.real.world.files.ref=/homegatk/src/test/resources/large/human_g1k_v37.20.21.fasta
+    -Ddisq.samtools.bin=/path/to/bin/samtools \
+    -Ddisq.bcftools.bin=/path/to/bin/bcftools
+```

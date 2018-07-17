@@ -15,6 +15,7 @@ import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.SamStreams;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.seekablestream.SeekableFileStream;
 import htsjdk.samtools.util.Locatable;
@@ -112,6 +113,16 @@ public class AnySamTestUtil {
   public static <T extends Locatable> int countReads(
       final String samPath, String refPath, HtsjdkReadsTraversalParameters<T> traversalParameters)
       throws IOException {
+    return countReads(
+        samPath, refPath, traversalParameters, ValidationStringency.DEFAULT_STRINGENCY);
+  }
+
+  public static <T extends Locatable> int countReads(
+      final String samPath,
+      String refPath,
+      HtsjdkReadsTraversalParameters<T> traversalParameters,
+      ValidationStringency validationStringency)
+      throws IOException {
 
     final File samFile = new File(URI.create(samPath));
     final File refFile = refPath == null ? null : new File(URI.create(refPath));
@@ -144,6 +155,7 @@ public class AnySamTestUtil {
       // we can't call query() on SamReader for SAM files, so we have to do interval filtering here
       try (SamReader samReader =
           SamReaderFactory.makeDefault()
+              .validationStringency(validationStringency)
               .referenceSource(referenceSource)
               .open(SamInputResource.of(samFile))) {
         for (SAMRecord record : samReader) {
@@ -172,6 +184,7 @@ public class AnySamTestUtil {
 
     try (SamReader bamReader =
         SamReaderFactory.makeDefault()
+            .validationStringency(validationStringency)
             .referenceSource(referenceSource)
             .open(SamInputResource.of(samFile))) {
       Iterator<SAMRecord> it;

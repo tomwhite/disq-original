@@ -8,14 +8,21 @@ import java.net.URI;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.PumpStreamHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BcftoolsTestUtil {
+
+  private static final Logger logger = LoggerFactory.getLogger(SamtoolsTestUtil.class);
 
   private static final String BCFTOOLS_BIN_PROPERTY = "disq.bcftools.bin";
 
   public static boolean isBcftoolsAvailable() {
     String bin = getBcftoolsBin();
     if (bin == null) {
+      logger.warn(
+          "No bcftools binary found. Set property {} to enable testing with bcftools.",
+          BCFTOOLS_BIN_PROPERTY);
       return false;
     }
     File binFile = new File(bin);

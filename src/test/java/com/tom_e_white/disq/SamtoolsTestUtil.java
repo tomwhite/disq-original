@@ -8,14 +8,21 @@ import java.net.URI;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.PumpStreamHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SamtoolsTestUtil {
+
+  private static final Logger logger = LoggerFactory.getLogger(SamtoolsTestUtil.class);
 
   private static final String SAMTOOLS_BIN_PROPERTY = "disq.samtools.bin";
 
   public static boolean isSamtoolsAvailable() {
     String bin = getSamtoolsBin();
     if (bin == null) {
+      logger.warn(
+          "No samtools binary found. Set property {} to enable testing with samtools.",
+          SAMTOOLS_BIN_PROPERTY);
       return false;
     }
     File binFile = new File(bin);
