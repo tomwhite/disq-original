@@ -1,5 +1,6 @@
 package com.tom_e_white.disq;
 
+import com.tom_e_white.disq.impl.file.NioFileSystemWrapper;
 import com.tom_e_white.disq.impl.formats.BoundedTraversalUtil;
 import com.tom_e_white.disq.impl.formats.sam.SamFormat;
 import htsjdk.samtools.BAMIndexer;
@@ -21,12 +22,13 @@ import htsjdk.samtools.seekablestream.SeekableFileStream;
 import htsjdk.samtools.util.Locatable;
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Iterator;
 import org.junit.Assert;
@@ -124,12 +126,12 @@ public class AnySamTestUtil {
       ValidationStringency validationStringency)
       throws IOException {
 
-    final File samFile = new File(URI.create(samPath));
+    final Path samFile = NioFileSystemWrapper.asPath(samPath);
     final File refFile = refPath == null ? null : new File(URI.create(refPath));
 
     // test file contents is consistent with extension
-    try (InputStream in = new BufferedInputStream(new FileInputStream(samFile))) {
-      SamFormat samFormat = SamFormat.fromPath(samFile.getAbsolutePath());
+    try (InputStream in = new BufferedInputStream(Files.newInputStream(samFile))) {
+      SamFormat samFormat = SamFormat.fromPath(samFile.toString());
       if (samFormat == null) {
         Assert.fail("File is not recognized: " + samFile);
       }
@@ -151,7 +153,7 @@ public class AnySamTestUtil {
     ReferenceSource referenceSource = refFile == null ? null : new ReferenceSource(refFile);
     int recCount = 0;
 
-    if (SamFormat.SAM.fileMatches(samFile.getName())) {
+    if (SamFormat.SAM.fileMatches(samFile.toString())) {
       // we can't call query() on SamReader for SAM files, so we have to do interval filtering here
       try (SamReader samReader =
           SamReaderFactory.makeDefault()

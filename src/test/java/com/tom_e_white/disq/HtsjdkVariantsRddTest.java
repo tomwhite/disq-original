@@ -6,9 +6,12 @@ import com.tom_e_white.disq.HtsjdkVariantsRddStorage.FormatWriteOption;
 import com.tom_e_white.disq.impl.formats.vcf.VcfFormat;
 import htsjdk.samtools.util.Interval;
 import htsjdk.variant.variantcontext.VariantContext;
-import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -159,9 +162,10 @@ public class HtsjdkVariantsRddTest extends BaseTest {
     HtsjdkVariantsRdd htsjdkVariantsRdd = htsjdkVariantsRddStorage.read(inputPath);
     int expectedCount = countVariants(inputPath);
 
-    File outputFile = createTempFile(VcfFormat.VCF.getExtension());
-    Assert.assertTrue(outputFile.createNewFile()); // create the file to check that overwrite works
-    String outputPath = outputFile.toURI().toString();
+    String outputPath = createTempPath(VcfFormat.VCF.getExtension());
+    Path p = Paths.get(URI.create(outputPath));
+    Files.createFile(p); // create the file to check that overwrite works
+    Assert.assertTrue(Files.exists(p));
     htsjdkVariantsRddStorage.write(htsjdkVariantsRdd, outputPath);
     Assert.assertEquals(expectedCount, countVariants(outputPath));
   }

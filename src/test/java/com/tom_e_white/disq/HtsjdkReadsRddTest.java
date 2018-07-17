@@ -7,9 +7,12 @@ import com.tom_e_white.disq.impl.formats.sam.SamFormat;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
-import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import junitparams.JUnitParamsRunner;
@@ -29,6 +32,13 @@ public class HtsjdkReadsRddTest extends BaseTest {
       {"valid.cram", "valid.fasta", FormatWriteOption.CRAM, 128 * 1024, true},
       {"valid_no_index.cram", "valid.fasta", FormatWriteOption.CRAM, 128 * 1024, false},
       {"test.sam", null, FormatWriteOption.SAM, 128 * 1024, false},
+      {
+        "gs://genomics-public-data/NA12878.chr20.sample.bam",
+        null,
+        FormatWriteOption.BAM,
+        128 * 1024,
+        true
+      }
     };
   }
 
@@ -327,9 +337,10 @@ public class HtsjdkReadsRddTest extends BaseTest {
     HtsjdkReadsRdd htsjdkReadsRdd = htsjdkReadsRddStorage.read(inputPath);
     int expectedCount = countReads(inputPath);
 
-    File outputFile = createTempFile(SamFormat.BAM.getExtension());
-    Assert.assertTrue(outputFile.createNewFile()); // create the file to check that overwrite works
-    String outputPath = outputFile.toURI().toString();
+    String outputPath = createTempPath(SamFormat.BAM.getExtension());
+    Path p = Paths.get(URI.create(outputPath));
+    Files.createFile(p); // create the file to check that overwrite works
+    Assert.assertTrue(Files.exists(p));
     htsjdkReadsRddStorage.write(htsjdkReadsRdd, outputPath);
     Assert.assertEquals(expectedCount, countReads(outputPath));
   }

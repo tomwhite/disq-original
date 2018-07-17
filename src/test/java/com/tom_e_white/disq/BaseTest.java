@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,14 +28,18 @@ public abstract class BaseTest {
     jsc.stop();
   }
 
-  protected String getPath(String localResource) throws URISyntaxException {
-    if (localResource == null) {
+  protected String getPath(String pathOrLocalResource) throws URISyntaxException {
+    if (pathOrLocalResource == null) {
       return null;
     }
-    return ClassLoader.getSystemClassLoader().getResource(localResource).toURI().toString();
+    URL resource = ClassLoader.getSystemClassLoader().getResource(pathOrLocalResource);
+    if (resource == null) {
+      return pathOrLocalResource;
+    }
+    return resource.toURI().toString();
   }
 
-  protected File createTempFile(String extension) throws IOException {
+  private File createTempFile(String extension) throws IOException {
     File file = File.createTempFile("test", extension);
     file.delete();
     file.deleteOnExit();
