@@ -23,7 +23,6 @@ below for details on each feature.
 | ------------------------------- | ----------------------------- | ----------------------------- | ----------------------------- | ----------------------------- |
 | Filesystems - Hadoop (r/w)      | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Filesystems - NIO (r)           | :white_check_mark:            | :white_check_mark:            | :x:                           | :x:                           |
-| Filesystems - NIO (w)           | :x:                           | :x:                           | :x:                           | :x:                           |
 | Compression                     | NA                            | NA                            | NA                            | :white_check_mark:            |
 | Multiple input files            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
 | Sharded output                  | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            | :white_check_mark:            |
@@ -55,7 +54,7 @@ Writing files will create new files or overwrite existing files without warning.
 
 ### Filesystems
 
-Two filesystem abstractions are supported for reading and writing all formats: the Hadoop filesystem (HDFS, local,
+Two filesystem abstractions are supported: the Hadoop filesystem (HDFS, local,
 and others such as S3), and Java NIO filesystems (local, S3, GCS, etc).
 
 Only one filesystem abstraction is used for each operation (unlike current Hadoop-BAM, which 
@@ -63,6 +62,9 @@ mixes the two, e.g. using Hadoop for bulk loading, and the HDFS NIO plugin for m
 operations). The choice of which to use (Hadoop vs. NIO) is set by the user. Roughly speaking,
 Hadoop is best for HDFS clusters (including those running in the cloud), and NIO is appropriate
 for cloud stores.
+
+NIO is only supported for reading, since writing has more complex commit semantics and is out of scope.
+For writing to a cloud store use a Hadoop filesystem such as S3a or the GCS connector.
 
 ### Compression
 
