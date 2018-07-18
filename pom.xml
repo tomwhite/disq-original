@@ -3,7 +3,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.tom_e_white</groupId>
+    <groupId>org.disq-bio</groupId>
     <artifactId>disq</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
@@ -121,7 +121,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.0.1</version>
                 <configuration>
-                    <excludePackageNames>com.tom_e_white.disq.impl.*,htsjdk.*</excludePackageNames>
+                    <excludePackageNames>org.disq_bio.disq.impl.*,htsjdk.*</excludePackageNames>
                     <failOnError>true</failOnError>
                 </configuration>
                 <executions>
@@ -162,7 +162,7 @@
                 <version>3.1.5</version>
                 <configuration>
                     <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
-                    <onlyAnalyze>com.tom_e_white.disq.-</onlyAnalyze>
+                    <onlyAnalyze>org.disq_bio.disq.-</onlyAnalyze>
                     <xmlOutput>true</xmlOutput>
                 </configuration>
                 <executions>

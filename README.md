@@ -182,7 +182,7 @@ Then to use the library in your project, add the following dependency to your Ma
 
 ```xml
 <dependency>
-    <groupId>com.tom_e_white</groupId>
+    <groupId>org.disq-bio</groupId>
     <artifactId>disq</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
