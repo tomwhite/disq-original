@@ -14,6 +14,7 @@ import htsjdk.tribble.util.TabixUtils;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFCodec;
 import htsjdk.variant.vcf.VCFHeader;
+import htsjdk.variant.vcf.VCFHeaderVersion;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,11 +57,11 @@ public class VcfSource implements Serializable {
     }
   }
 
-  private VCFCodec getVCFCodec(JavaSparkContext jsc, String path) throws IOException {
+  private VersionAwareVCFCodec getVersionAwareVCFCodec(JavaSparkContext jsc, String path) throws IOException {
     try (SeekableStream headerIn =
         fileSystemWrapper.open(jsc.hadoopConfiguration(), getFirstPath(jsc, path))) {
       InputStream is = bufferAndDecompressIfNecessary(headerIn);
-      VCFCodec vcfCodec = new VCFCodec();
+      VersionAwareVCFCodec vcfCodec = new VersionAwareVCFCodec();
       vcfCodec.readHeader(new AsciiLineReaderIterator(AsciiLineReader.from(is)));
       return vcfCodec;
     }
@@ -96,14 +97,18 @@ public class VcfSource implements Serializable {
     }
     enableBGZFCodecs(conf);
 
-    Broadcast<VCFCodec> vcfCodecBroadcast = jsc.broadcast(getVCFCodec(jsc, path));
+    VersionAwareVCFCodec vcfCodec = getVersionAwareVCFCodec(jsc, path);
+    VCFHeader header = vcfCodec.getHeader();
+    VCFHeaderVersion version = vcfCodec.getVersion();
+    Broadcast<VCFHeader> headerBroadcast = jsc.broadcast(header);
     Broadcast<List<T>> intervalsBroadcast = intervals == null ? null : jsc.broadcast(intervals);
 
     return textFile(jsc, conf, path, intervals)
         .mapPartitions(
             (FlatMapFunction<Iterator<String>, VariantContext>)
                 lines -> {
-                  VCFCodec codec = vcfCodecBroadcast.getValue();
+                  VCFCodec codec = new VCFCodec();
+                  codec.setVCFHeader(headerBroadcast.getValue(), version);
                   final OverlapDetector<T> overlapDetector =
                       intervalsBroadcast == null
                           ? null
